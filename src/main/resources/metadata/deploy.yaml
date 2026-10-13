@@ -1,0 +1,8 @@
+group: io.kestra.plugin.ovhcloud.ai.deploy
+name: "deploy"
+title: "OVHcloud AI Deploy"
+description: "Tasks for deploying and serving AI model applications on OVHcloud"
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"

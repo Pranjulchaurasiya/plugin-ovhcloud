@@ -1,0 +1,8 @@
+group: io.kestra.plugin.ovhcloud.ai
+name: "ai"
+title: "OVHcloud AI"
+description: "Tasks for OVHcloud AI Training, AI Deploy, and AI Notebooks"
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
