@@ -52,7 +52,7 @@ public class CancelJob extends AbstractOvhTask implements RunnableTask<CancelJob
         String rProjectId = runContext.render(this.projectId).as(String.class).orElseThrow();
         String rJobId = runContext.render(this.jobId).as(String.class).orElseThrow();
 
-        String path = String.format("/cloud/project/%s/ai/job/%s/stop", rProjectId, rJobId);
+        String path = "/cloud/project/" + encodePath(rProjectId) + "/ai/job/" + encodePath(rJobId) + "/stop";
 
         HttpResponse res = this.executeOvhRequest(runContext, "POST", path, "{}");
         if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {

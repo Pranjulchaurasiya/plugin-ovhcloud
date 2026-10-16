@@ -52,7 +52,7 @@ public class DeleteApp extends AbstractOvhTask implements RunnableTask<DeleteApp
         String rProjectId = runContext.render(this.projectId).as(String.class).orElseThrow();
         String rAppId = runContext.render(this.appId).as(String.class).orElseThrow();
 
-        String path = String.format("/cloud/project/%s/ai/app/%s", rProjectId, rAppId);
+        String path = "/cloud/project/" + encodePath(rProjectId) + "/ai/app/" + encodePath(rAppId);
 
         HttpResponse res = this.executeOvhRequest(runContext, "DELETE", path, null);
         if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {

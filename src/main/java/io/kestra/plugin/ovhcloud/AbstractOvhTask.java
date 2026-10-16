@@ -16,8 +16,10 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @SuperBuilder
@@ -72,10 +74,36 @@ public abstract class AbstractOvhTask extends Task {
         }
     }
 
+    private static final Set<String> ALLOWED_OVH_HOSTS = Set.of(
+        "eu.api.ovh.com",
+        "ca.api.ovh.com",
+        "api.us.ovhcloud.com",
+        "api.syd.ovhcloud.com"
+    );
+
+    /** URL-encodes a single path segment (preserves hyphens, dots, underscores, tildes). */
+    public static String encodePath(String segment) {
+        try {
+            return URLEncoder.encode(segment, StandardCharsets.UTF_8).replace("+", "%20");
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to URL-encode path segment: " + segment, e);
+        }
+    }
+
     protected HttpResponse executeOvhRequest(RunContext runContext, String method, String path, String body) throws Exception {
         String rEndpoint = runContext.render(this.endpoint).as(String.class).orElse("https://eu.api.ovh.com/1.0").trim();
-        if (!rEndpoint.startsWith("https://") && !rEndpoint.startsWith("http://localhost") && !rEndpoint.startsWith("http://127.0.0.1")) {
-            throw new IllegalArgumentException("Insecure endpoint rejected: OVH API endpoint must use HTTPS (received: " + rEndpoint + ")");
+
+        URI parsedUri = URI.create(rEndpoint);
+        String host = parsedUri.getHost();
+        String scheme = parsedUri.getScheme();
+        boolean isLoopback = "localhost".equals(host) || "127.0.0.1".equals(host) || "::1".equals(host);
+        boolean isAllowedOvhHost = host != null && ALLOWED_OVH_HOSTS.contains(host);
+
+        if (!("https".equals(scheme) && isAllowedOvhHost) && !("http".equals(scheme) && isLoopback)) {
+            throw new IllegalArgumentException(
+                "Insecure or unrecognised OVH endpoint rejected. Host must be one of " + ALLOWED_OVH_HOSTS
+                + " over HTTPS, or localhost/127.0.0.1 over HTTP for testing. Received: " + rEndpoint
+            );
         }
         if (rEndpoint.endsWith("/")) {
             rEndpoint = rEndpoint.substring(0, rEndpoint.length() - 1);

@@ -9,6 +9,7 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.ovhcloud.AbstractOvhTask;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -63,11 +64,13 @@ public class CreateApp extends AbstractOvhTask implements RunnableTask<CreateApp
 
     @Schema(title = "Number of CPU cores allocated for the app (minimum 1, defaults to 1)")
     @Builder.Default
+    @Min(1)
     @io.kestra.core.models.annotations.PluginProperty(group = "advanced")
     private Property<Integer> cpu = Property.of(1);
 
     @Schema(title = "RAM allocated in Gigabytes (minimum 1, defaults to 2)")
     @Builder.Default
+    @Min(1)
     @io.kestra.core.models.annotations.PluginProperty(group = "advanced")
     private Property<Integer> memory = Property.of(2);
 
@@ -90,7 +93,7 @@ public class CreateApp extends AbstractOvhTask implements RunnableTask<CreateApp
         resources.put("memory", rMemory);
         payload.put("resources", resources);
 
-        String path = String.format("/cloud/project/%s/ai/app", rProjectId);
+        String path = "/cloud/project/" + encodePath(rProjectId) + "/ai/app";
         String jsonPayload = MAPPER.writeValueAsString(payload);
 
         HttpResponse res = this.executeOvhRequest(runContext, "POST", path, jsonPayload);

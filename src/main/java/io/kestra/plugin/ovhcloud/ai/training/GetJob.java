@@ -56,7 +56,7 @@ public class GetJob extends AbstractOvhTask implements RunnableTask<GetJob.Outpu
         String rProjectId = runContext.render(this.projectId).as(String.class).orElseThrow();
         String rJobId = runContext.render(this.jobId).as(String.class).orElseThrow();
 
-        String path = String.format("/cloud/project/%s/ai/job/%s", rProjectId, rJobId);
+        String path = "/cloud/project/" + encodePath(rProjectId) + "/ai/job/" + encodePath(rJobId);
 
         HttpResponse res = this.executeOvhRequest(runContext, "GET", path, null);
         if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {

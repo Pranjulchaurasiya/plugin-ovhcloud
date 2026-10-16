@@ -105,7 +105,7 @@ public class SubmitJob extends AbstractOvhTask implements RunnableTask<SubmitJob
             payload.put("resources", resources);
         }
 
-        String path = String.format("/cloud/project/%s/ai/job", rProjectId);
+        String path = "/cloud/project/" + encodePath(rProjectId) + "/ai/job";
         String jsonPayload = MAPPER.writeValueAsString(payload);
 
         HttpResponse res = this.executeOvhRequest(runContext, "POST", path, jsonPayload);
