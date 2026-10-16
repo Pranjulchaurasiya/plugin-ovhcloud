@@ -54,17 +54,21 @@ public class CreateApp extends AbstractOvhTask implements RunnableTask<CreateApp
 
     @Schema(title = "The container image to deploy for model serving")
     @NotNull
+    @io.kestra.core.models.annotations.PluginProperty(group = "main")
     private Property<String> image;
 
     @Schema(title = "A unique friendly name for the serving application")
+    @io.kestra.core.models.annotations.PluginProperty(group = "main")
     private Property<String> name;
 
-    @Schema(title = "Number of CPU cores allocated for the app")
+    @Schema(title = "Number of CPU cores allocated for the app (minimum 1, defaults to 1)")
     @Builder.Default
+    @io.kestra.core.models.annotations.PluginProperty(group = "advanced")
     private Property<Integer> cpu = Property.of(1);
 
-    @Schema(title = "RAM allocated in Gigabytes")
+    @Schema(title = "RAM allocated in Gigabytes (minimum 1, defaults to 2)")
     @Builder.Default
+    @io.kestra.core.models.annotations.PluginProperty(group = "advanced")
     private Property<Integer> memory = Property.of(2);
 
     @Override

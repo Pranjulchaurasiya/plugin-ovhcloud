@@ -44,6 +44,7 @@ import lombok.experimental.SuperBuilder;
 public class CancelJob extends AbstractOvhTask implements RunnableTask<CancelJob.Output> {
     @Schema(title = "The unique identifier of the training job to stop")
     @NotNull
+    @io.kestra.core.models.annotations.PluginProperty(group = "main")
     private Property<String> jobId;
 
     @Override

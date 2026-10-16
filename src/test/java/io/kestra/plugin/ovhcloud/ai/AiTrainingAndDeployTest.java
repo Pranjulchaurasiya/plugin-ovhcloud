@@ -147,6 +147,22 @@ class AiTrainingAndDeployTest {
     }
 
     @Test
+    void testInsecureEndpointRejection() {
+        RunContext runContext = runContextFactory.of();
+
+        GetJob task = GetJob.builder()
+            .endpoint(Property.of("http://evil-attacker.com/api"))
+            .applicationKey(Property.of("key"))
+            .applicationSecret(Property.of("sec"))
+            .consumerKey(Property.of("ck"))
+            .projectId(Property.of("p1"))
+            .jobId(Property.of("j1"))
+            .build();
+
+        assertThrows(IllegalArgumentException.class, () -> task.run(runContext));
+    }
+
+    @Test
     void testMissingCredentialsThrows() {
         RunContext runContext = runContextFactory.of();
 
@@ -157,3 +173,4 @@ class AiTrainingAndDeployTest {
         assertThrows(Exception.class, () -> task.run(runContext));
     }
 }
+

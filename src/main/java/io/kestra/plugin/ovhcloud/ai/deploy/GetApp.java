@@ -48,6 +48,7 @@ public class GetApp extends AbstractOvhTask implements RunnableTask<GetApp.Outpu
 
     @Schema(title = "The unique identifier of the serving application")
     @NotNull
+    @io.kestra.core.models.annotations.PluginProperty(group = "main")
     private Property<String> appId;
 
     @Override

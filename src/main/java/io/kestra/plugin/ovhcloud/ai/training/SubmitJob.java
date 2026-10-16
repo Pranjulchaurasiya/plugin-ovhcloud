@@ -56,19 +56,24 @@ public class SubmitJob extends AbstractOvhTask implements RunnableTask<SubmitJob
 
     @Schema(title = "The container image to execute for training")
     @NotNull
+    @io.kestra.core.models.annotations.PluginProperty(group = "main")
     private Property<String> image;
 
     @Schema(title = "The command line arguments for the training container")
+    @io.kestra.core.models.annotations.PluginProperty(group = "main")
     private Property<List<String>> command;
 
     @Schema(title = "A user-friendly name for the training job")
+    @io.kestra.core.models.annotations.PluginProperty(group = "main")
     private Property<String> name;
 
     @Schema(title = "Number of GPUs to allocate for the job")
     @Builder.Default
+    @io.kestra.core.models.annotations.PluginProperty(group = "advanced")
     private Property<Integer> gpu = Property.of(0);
 
     @Schema(title = "GPU model type (e.g. 'Tesla-V100S', 'A100')")
+    @io.kestra.core.models.annotations.PluginProperty(group = "advanced")
     private Property<String> gpuModel;
 
     @Override

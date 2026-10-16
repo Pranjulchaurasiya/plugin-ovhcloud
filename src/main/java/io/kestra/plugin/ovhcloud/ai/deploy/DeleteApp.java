@@ -44,6 +44,7 @@ import lombok.experimental.SuperBuilder;
 public class DeleteApp extends AbstractOvhTask implements RunnableTask<DeleteApp.Output> {
     @Schema(title = "The unique identifier of the serving application to delete")
     @NotNull
+    @io.kestra.core.models.annotations.PluginProperty(group = "main")
     private Property<String> appId;
 
     @Override

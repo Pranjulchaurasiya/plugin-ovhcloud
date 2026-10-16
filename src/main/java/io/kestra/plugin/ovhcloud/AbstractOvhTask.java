@@ -28,25 +28,33 @@ import java.util.stream.Collectors;
 public abstract class AbstractOvhTask extends Task {
     @Schema(title = "The OVH API endpoint URL (defaults to 'https://eu.api.ovh.com/1.0')")
     @Builder.Default
+    @io.kestra.core.models.annotations.PluginProperty(group = "connection")
     protected Property<String> endpoint = Property.of("https://eu.api.ovh.com/1.0");
 
     @Schema(title = "The OVH application key")
     @NotNull
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     @io.kestra.core.models.annotations.PluginProperty(group = "connection", secret = true)
     protected Property<String> applicationKey;
 
     @Schema(title = "The OVH application secret")
     @NotNull
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     @io.kestra.core.models.annotations.PluginProperty(group = "connection", secret = true)
     protected Property<String> applicationSecret;
 
     @Schema(title = "The OVH consumer key")
     @NotNull
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     @io.kestra.core.models.annotations.PluginProperty(group = "connection", secret = true)
     protected Property<String> consumerKey;
 
     @Schema(title = "The OVH Public Cloud project ID (serviceName)")
     @NotNull
+    @io.kestra.core.models.annotations.PluginProperty(group = "main")
     protected Property<String> projectId;
 
     public static String computeOvhSignature(String appSecret, String consumerKey, String method, String fullUrl, String body, long timestamp) {
@@ -65,7 +73,10 @@ public abstract class AbstractOvhTask extends Task {
     }
 
     protected HttpResponse executeOvhRequest(RunContext runContext, String method, String path, String body) throws Exception {
-        String rEndpoint = runContext.render(this.endpoint).as(String.class).orElse("https://eu.api.ovh.com/1.0");
+        String rEndpoint = runContext.render(this.endpoint).as(String.class).orElse("https://eu.api.ovh.com/1.0").trim();
+        if (!rEndpoint.startsWith("https://") && !rEndpoint.startsWith("http://localhost") && !rEndpoint.startsWith("http://127.0.0.1")) {
+            throw new IllegalArgumentException("Insecure endpoint rejected: OVH API endpoint must use HTTPS (received: " + rEndpoint + ")");
+        }
         if (rEndpoint.endsWith("/")) {
             rEndpoint = rEndpoint.substring(0, rEndpoint.length() - 1);
         }

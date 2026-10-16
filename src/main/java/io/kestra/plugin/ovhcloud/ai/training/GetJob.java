@@ -48,6 +48,7 @@ public class GetJob extends AbstractOvhTask implements RunnableTask<GetJob.Outpu
 
     @Schema(title = "The unique identifier of the training job")
     @NotNull
+    @io.kestra.core.models.annotations.PluginProperty(group = "main")
     private Property<String> jobId;
 
     @Override
