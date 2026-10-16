@@ -163,6 +163,72 @@ class AiTrainingAndDeployTest {
     }
 
     @Test
+    void testEncodePath() {
+        assertThat(AbstractOvhTask.encodePath("job-12345"), is("job-12345"));
+        assertThat(AbstractOvhTask.encodePath("app with space"), is("app%20with%20space"));
+
+        assertThrows(IllegalArgumentException.class, () -> AbstractOvhTask.encodePath(null));
+        assertThrows(IllegalArgumentException.class, () -> AbstractOvhTask.encodePath("   "));
+        assertThrows(IllegalArgumentException.class, () -> AbstractOvhTask.encodePath("."));
+        assertThrows(IllegalArgumentException.class, () -> AbstractOvhTask.encodePath(".."));
+        assertThrows(IllegalArgumentException.class, () -> AbstractOvhTask.encodePath("../traversal"));
+        assertThrows(IllegalArgumentException.class, () -> AbstractOvhTask.encodePath("folder/job"));
+        assertThrows(IllegalArgumentException.class, () -> AbstractOvhTask.encodePath("folder\\job"));
+    }
+
+    @Test
+    void testCreateAppCpuAndMemoryBounds() {
+        RunContext runContext = runContextFactory.of();
+
+        CreateApp zeroCpu = CreateApp.builder()
+            .projectId(Property.of("p1"))
+            .image(Property.of("img:latest"))
+            .cpu(Property.of(0))
+            .build();
+        assertThrows(IllegalArgumentException.class, () -> zeroCpu.run(runContext));
+
+        CreateApp excessiveCpu = CreateApp.builder()
+            .projectId(Property.of("p1"))
+            .image(Property.of("img:latest"))
+            .cpu(Property.of(512))
+            .build();
+        assertThrows(IllegalArgumentException.class, () -> excessiveCpu.run(runContext));
+
+        CreateApp zeroMemory = CreateApp.builder()
+            .projectId(Property.of("p1"))
+            .image(Property.of("img:latest"))
+            .memory(Property.of(0))
+            .build();
+        assertThrows(IllegalArgumentException.class, () -> zeroMemory.run(runContext));
+
+        CreateApp excessiveMemory = CreateApp.builder()
+            .projectId(Property.of("p1"))
+            .image(Property.of("img:latest"))
+            .memory(Property.of(4096))
+            .build();
+        assertThrows(IllegalArgumentException.class, () -> excessiveMemory.run(runContext));
+    }
+
+    @Test
+    void testSubmitJobGpuBounds() {
+        RunContext runContext = runContextFactory.of();
+
+        SubmitJob negativeGpu = SubmitJob.builder()
+            .projectId(Property.of("p1"))
+            .image(Property.of("img:latest"))
+            .gpu(Property.of(-1))
+            .build();
+        assertThrows(IllegalArgumentException.class, () -> negativeGpu.run(runContext));
+
+        SubmitJob excessiveGpu = SubmitJob.builder()
+            .projectId(Property.of("p1"))
+            .image(Property.of("img:latest"))
+            .gpu(Property.of(16))
+            .build();
+        assertThrows(IllegalArgumentException.class, () -> excessiveGpu.run(runContext));
+    }
+
+    @Test
     void testMissingCredentialsThrows() {
         RunContext runContext = runContextFactory.of();
 

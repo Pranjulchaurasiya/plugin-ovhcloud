@@ -9,6 +9,8 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.ovhcloud.AbstractOvhTask;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -67,8 +69,10 @@ public class SubmitJob extends AbstractOvhTask implements RunnableTask<SubmitJob
     @io.kestra.core.models.annotations.PluginProperty(group = "main")
     private Property<String> name;
 
-    @Schema(title = "Number of GPUs to allocate for the job")
+    @Schema(title = "Number of GPUs to allocate for the job (between 0 and 8, defaults to 0)")
     @Builder.Default
+    @Min(0)
+    @Max(8)
     @io.kestra.core.models.annotations.PluginProperty(group = "advanced")
     private Property<Integer> gpu = Property.of(0);
 
@@ -84,6 +88,10 @@ public class SubmitJob extends AbstractOvhTask implements RunnableTask<SubmitJob
         String rName = runContext.render(this.name).as(String.class).orElse(null);
         Integer rGpu = runContext.render(this.gpu).as(Integer.class).orElse(0);
         String rGpuModel = runContext.render(this.gpuModel).as(String.class).orElse(null);
+
+        if (rGpu < 0 || rGpu > 8) {
+            throw new IllegalArgumentException("GPU allocation must be between 0 and 8 (received: " + rGpu + ")");
+        }
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("image", rImage);

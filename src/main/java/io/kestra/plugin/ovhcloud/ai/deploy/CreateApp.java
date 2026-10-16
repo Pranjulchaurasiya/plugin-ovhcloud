@@ -9,6 +9,7 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.ovhcloud.AbstractOvhTask;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -62,15 +63,17 @@ public class CreateApp extends AbstractOvhTask implements RunnableTask<CreateApp
     @io.kestra.core.models.annotations.PluginProperty(group = "main")
     private Property<String> name;
 
-    @Schema(title = "Number of CPU cores allocated for the app (minimum 1, defaults to 1)")
+    @Schema(title = "Number of CPU cores allocated for the app (between 1 and 256, defaults to 1)")
     @Builder.Default
     @Min(1)
+    @Max(256)
     @io.kestra.core.models.annotations.PluginProperty(group = "advanced")
     private Property<Integer> cpu = Property.of(1);
 
-    @Schema(title = "RAM allocated in Gigabytes (minimum 1, defaults to 2)")
+    @Schema(title = "RAM allocated in Gigabytes (between 1 and 2048, defaults to 2)")
     @Builder.Default
     @Min(1)
+    @Max(2048)
     @io.kestra.core.models.annotations.PluginProperty(group = "advanced")
     private Property<Integer> memory = Property.of(2);
 
@@ -81,6 +84,13 @@ public class CreateApp extends AbstractOvhTask implements RunnableTask<CreateApp
         String rName = runContext.render(this.name).as(String.class).orElse(null);
         Integer rCpu = runContext.render(this.cpu).as(Integer.class).orElse(1);
         Integer rMemory = runContext.render(this.memory).as(Integer.class).orElse(2);
+
+        if (rCpu < 1 || rCpu > 256) {
+            throw new IllegalArgumentException("CPU cores must be between 1 and 256 (received: " + rCpu + ")");
+        }
+        if (rMemory < 1 || rMemory > 2048) {
+            throw new IllegalArgumentException("Memory must be between 1 and 2048 GB (received: " + rMemory + ")");
+        }
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("image", rImage);

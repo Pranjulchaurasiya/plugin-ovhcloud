@@ -81,8 +81,14 @@ public abstract class AbstractOvhTask extends Task {
         "api.syd.ovhcloud.com"
     );
 
-    /** URL-encodes a single path segment (preserves hyphens, dots, underscores, tildes). */
+    /** URL-encodes a single path segment and guards against dot-segment path traversal (e.g. '.', '..'). */
     public static String encodePath(String segment) {
+        if (segment == null || segment.isBlank()) {
+            throw new IllegalArgumentException("Path segment must not be null or blank");
+        }
+        if (segment.equals(".") || segment.equals("..") || segment.contains("/") || segment.contains("\\") || segment.contains("..")) {
+            throw new IllegalArgumentException("Invalid path segment: path traversal segments ('.', '..') are not permitted (received: " + segment + ")");
+        }
         try {
             return URLEncoder.encode(segment, StandardCharsets.UTF_8).replace("+", "%20");
         } catch (Exception e) {
@@ -94,15 +100,21 @@ public abstract class AbstractOvhTask extends Task {
         String rEndpoint = runContext.render(this.endpoint).as(String.class).orElse("https://eu.api.ovh.com/1.0").trim();
 
         URI parsedUri = URI.create(rEndpoint);
+        if (parsedUri.getUserInfo() != null) {
+            throw new IllegalArgumentException("Insecure endpoint rejected: user-info in endpoint URL is not permitted");
+        }
+
         String host = parsedUri.getHost();
         String scheme = parsedUri.getScheme();
-        boolean isLoopback = "localhost".equals(host) || "127.0.0.1".equals(host) || "::1".equals(host);
-        boolean isAllowedOvhHost = host != null && ALLOWED_OVH_HOSTS.contains(host);
+        boolean isLoopback = "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host) || "::1".equals(host) || "[::1]".equals(host);
+        boolean isAllowedOvhHost = host != null && ALLOWED_OVH_HOSTS.contains(host.toLowerCase(java.util.Locale.ROOT));
+        int port = parsedUri.getPort();
+        boolean isStandardHttpsPort = (port == -1 || port == 443);
 
-        if (!("https".equals(scheme) && isAllowedOvhHost) && !("http".equals(scheme) && isLoopback)) {
+        if (!("https".equalsIgnoreCase(scheme) && isAllowedOvhHost && isStandardHttpsPort) && !("http".equalsIgnoreCase(scheme) && isLoopback)) {
             throw new IllegalArgumentException(
                 "Insecure or unrecognised OVH endpoint rejected. Host must be one of " + ALLOWED_OVH_HOSTS
-                + " over HTTPS, or localhost/127.0.0.1 over HTTP for testing. Received: " + rEndpoint
+                + " over HTTPS (port 443), or localhost/127.0.0.1/[::1] over HTTP for testing."
             );
         }
         if (rEndpoint.endsWith("/")) {
