@@ -1,12 +1,12 @@
 package io.kestra.plugin.ovhcloud.ai.deploy;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.plugin.ovhcloud.AbstractOvhTask;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
@@ -15,6 +15,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -39,57 +40,78 @@ import java.util.Map;
                 tasks:
                   - id: create_endpoint
                     type: io.kestra.plugin.ovhcloud.ai.deploy.CreateApp
-                    applicationKey: "{{ secret('OVH_APP_KEY') }}"
-                    applicationSecret: "{{ secret('OVH_APP_SECRET') }}"
-                    consumerKey: "{{ secret('OVH_CONSUMER_KEY') }}"
-                    projectId: "{{ secret('OVH_PROJECT_ID') }}"
+                    token: "{{ secret('OVH_AI_TOKEN') }}"
                     image: "my-docker-registry/fraud-model:v1"
                     name: "fraud-detector-api"
                     cpu: 2
-                    memory: 4
                 """
         )
     }
 )
 public class CreateApp extends AbstractOvhTask implements RunnableTask<CreateApp.Output> {
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
-    @Schema(title = "The container image to deploy for model serving")
+    @Schema(
+        title = "The container image to deploy for model serving",
+        description = "Container image URI exposing an HTTP inference service."
+    )
     @NotNull
-    @io.kestra.core.models.annotations.PluginProperty(group = "main")
+    @PluginProperty(group = "main")
     private Property<String> image;
 
-    @Schema(title = "A unique friendly name for the serving application")
-    @io.kestra.core.models.annotations.PluginProperty(group = "main")
+    @Schema(
+        title = "A unique friendly name for the serving application",
+        description = "Identifier tag displayed on the OVHcloud AI dashboard."
+    )
+    @PluginProperty(group = "main")
     private Property<String> name;
 
-    @Schema(title = "Number of CPU cores allocated for the app (between 1 and 256, defaults to 1)")
-    @Builder.Default
+    @Schema(
+        title = "Number of CPU cores allocated for the app",
+        description = "Must be between 1 and 12 cores. Mutually exclusive with 'gpu'. Defaults to 1 core."
+    )
     @Min(1)
-    @Max(256)
-    @io.kestra.core.models.annotations.PluginProperty(group = "advanced")
-    private Property<Integer> cpu = Property.of(1);
+    @Max(12)
+    @PluginProperty(group = "advanced")
+    private Property<Integer> cpu;
 
-    @Schema(title = "RAM allocated in Gigabytes (between 1 and 2048, defaults to 2)")
-    @Builder.Default
+    @Schema(
+        title = "Number of GPUs allocated for the app",
+        description = "Must be between 1 and 4 GPUs. Mutually exclusive with 'cpu'."
+    )
     @Min(1)
-    @Max(2048)
-    @io.kestra.core.models.annotations.PluginProperty(group = "advanced")
-    private Property<Integer> memory = Property.of(2);
+    @Max(4)
+    @PluginProperty(group = "advanced")
+    private Property<Integer> gpu;
+
+    @Schema(
+        title = "GPU model type",
+        description = "Specific accelerator model requested (e.g. 'Tesla-V100S', 'A100-SXM4-40GB', 'L4', 'L40S')."
+    )
+    @PluginProperty(group = "advanced")
+    private Property<String> gpuModel;
+
+    @Override
+    protected String defaultEndpoint() {
+        return "https://gra.deploy.ai.cloud.ovh.net";
+    }
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        String rProjectId = runContext.render(this.projectId).as(String.class).orElseThrow();
         String rImage = runContext.render(this.image).as(String.class).orElseThrow();
         String rName = runContext.render(this.name).as(String.class).orElse(null);
-        Integer rCpu = runContext.render(this.cpu).as(Integer.class).orElse(1);
-        Integer rMemory = runContext.render(this.memory).as(Integer.class).orElse(2);
+        Integer rCpu = this.cpu != null ? runContext.render(this.cpu).as(Integer.class).orElse(null) : null;
+        Integer rGpu = this.gpu != null ? runContext.render(this.gpu).as(Integer.class).orElse(null) : null;
+        String rGpuModel = this.gpuModel != null ? runContext.render(this.gpuModel).as(String.class).orElse(null) : null;
 
-        if (rCpu < 1 || rCpu > 256) {
-            throw new IllegalArgumentException("CPU cores must be between 1 and 256 (received: " + rCpu + ")");
+        if (rCpu != null && (rCpu < 1 || rCpu > 12)) {
+            throw new IllegalArgumentException("CPU allocation must be between 1 and 12 cores (received: " + rCpu + ")");
         }
-        if (rMemory < 1 || rMemory > 2048) {
-            throw new IllegalArgumentException("Memory must be between 1 and 2048 GB (received: " + rMemory + ")");
+
+        if (rGpu != null && (rGpu < 1 || rGpu > 4)) {
+            throw new IllegalArgumentException("GPU allocation must be between 1 and 4 GPUs (received: " + rGpu + ")");
+        }
+
+        if (rCpu != null && rGpu != null) {
+            throw new IllegalArgumentException("Cannot allocate both 'cpu' and 'gpu': OVHcloud AI Deploy flavors are either CPU-based or GPU-based.");
         }
 
         Map<String, Object> payload = new HashMap<>();
@@ -99,27 +121,37 @@ public class CreateApp extends AbstractOvhTask implements RunnableTask<CreateApp
         }
 
         Map<String, Object> resources = new HashMap<>();
-        resources.put("cpu", rCpu);
-        resources.put("memory", rMemory);
+        if (rGpu != null) {
+            resources.put("gpu", rGpu);
+            if (rGpuModel != null && !rGpuModel.isBlank()) {
+                resources.put("gpuModel", rGpuModel);
+            }
+        } else {
+            int cpuCount = (rCpu != null) ? rCpu : 1;
+            resources.put("cpu", cpuCount);
+        }
         payload.put("resources", resources);
 
-        String path = "/cloud/project/" + encodePath(rProjectId) + "/ai/app";
-        String jsonPayload = MAPPER.writeValueAsString(payload);
-
-        HttpResponse res = this.executeOvhRequest(runContext, "POST", path, jsonPayload);
+        String jsonPayload = JacksonMapper.ofJson().writeValueAsString(payload);
+        HttpResponse res = this.executeOvhRequest(runContext, "POST", "/v1/app", jsonPayload);
         if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
             throw new RuntimeException("OVHcloud AI CreateApp failed with status " + res.getStatusCode() + ": " + res.getBody());
         }
 
-        JsonNode root = MAPPER.readTree(res.getBody());
-        String appId = root.has("id") ? root.get("id").asText() : "";
-        String status = root.has("status") ? (root.get("status").isObject() ? root.get("status").path("state").asText() : root.get("status").asText()) : "STARTING";
-        String url = root.has("url") ? root.get("url").asText() : null;
+        if (res.getBody() == null || res.getBody().isBlank()) {
+            throw new IllegalStateException("OVHcloud AI CreateApp response body is empty");
+        }
+
+        AppResponse response = JacksonMapper.ofJson().readValue(res.getBody(), AppResponse.class);
+        if (response == null || response.getId() == null || response.getId().isBlank()) {
+            throw new IllegalStateException("OVHcloud AI response is missing required 'id' property: " + res.getBody());
+        }
 
         return Output.builder()
-            .appId(appId)
-            .status(status)
-            .url(url)
+            .appId(response.getId())
+            .status(response.getState())
+            .url(response.getUrl())
+            .createdAt(response.getCreatedAtInstant())
             .build();
     }
 
@@ -134,5 +166,8 @@ public class CreateApp extends AbstractOvhTask implements RunnableTask<CreateApp
 
         @Schema(title = "The public or private URL endpoint exposing the AI service")
         private final String url;
+
+        @Schema(title = "Creation timestamp of the application")
+        private final Instant createdAt;
     }
 }

@@ -2,6 +2,7 @@ package io.kestra.plugin.ovhcloud.ai.deploy;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
@@ -32,27 +33,30 @@ import lombok.experimental.SuperBuilder;
                 tasks:
                   - id: teardown_app
                     type: io.kestra.plugin.ovhcloud.ai.deploy.DeleteApp
-                    applicationKey: "{{ secret('OVH_APP_KEY') }}"
-                    applicationSecret: "{{ secret('OVH_APP_SECRET') }}"
-                    consumerKey: "{{ secret('OVH_CONSUMER_KEY') }}"
-                    projectId: "{{ secret('OVH_PROJECT_ID') }}"
+                    token: "{{ secret('OVH_AI_TOKEN') }}"
                     appId: "00000000-0000-0000-0000-000000000000"
                 """
         )
     }
 )
 public class DeleteApp extends AbstractOvhTask implements RunnableTask<DeleteApp.Output> {
-    @Schema(title = "The unique identifier of the serving application to delete")
+    @Schema(
+        title = "The unique identifier of the serving application to delete",
+        description = "UUID of the application to terminate and remove."
+    )
     @NotNull
-    @io.kestra.core.models.annotations.PluginProperty(group = "main")
+    @PluginProperty(group = "main")
     private Property<String> appId;
 
     @Override
-    public Output run(RunContext runContext) throws Exception {
-        String rProjectId = runContext.render(this.projectId).as(String.class).orElseThrow();
-        String rAppId = runContext.render(this.appId).as(String.class).orElseThrow();
+    protected String defaultEndpoint() {
+        return "https://gra.deploy.ai.cloud.ovh.net";
+    }
 
-        String path = "/cloud/project/" + encodePath(rProjectId) + "/ai/app/" + encodePath(rAppId);
+    @Override
+    public Output run(RunContext runContext) throws Exception {
+        String rAppId = runContext.render(this.appId).as(String.class).orElseThrow();
+        String path = "/v1/app/" + encodePath(rAppId);
 
         HttpResponse res = this.executeOvhRequest(runContext, "DELETE", path, null);
         if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {

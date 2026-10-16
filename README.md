@@ -45,8 +45,13 @@
 
 ## What
 
-- Provides plugin components under `io.kestra.plugin.ovhcloud`.
-- Includes classes such as `Example`, `Trigger`.
+- Provides tasks for OVHcloud AI Training and Deploy under `io.kestra.plugin.ovhcloud.ai`:
+  - `io.kestra.plugin.ovhcloud.ai.training.SubmitJob`: Submit distributed AI training jobs with GPU/CPU support.
+  - `io.kestra.plugin.ovhcloud.ai.training.GetJob`: Inspect status, metrics, and timestamps of training jobs.
+  - `io.kestra.plugin.ovhcloud.ai.training.CancelJob`: Terminate running training jobs.
+  - `io.kestra.plugin.ovhcloud.ai.deploy.CreateApp`: Deploy scalable AI model serving containers.
+  - `io.kestra.plugin.ovhcloud.ai.deploy.GetApp`: Retrieve status and endpoints of deployed applications.
+  - `io.kestra.plugin.ovhcloud.ai.deploy.DeleteApp`: Teardown model serving applications.
 
 ## Running Kestra locally with this plugin
 

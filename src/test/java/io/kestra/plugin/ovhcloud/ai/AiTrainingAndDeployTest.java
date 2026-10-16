@@ -1,5 +1,7 @@
 package io.kestra.plugin.ovhcloud.ai;
 
+import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
@@ -12,127 +14,367 @@ import io.kestra.plugin.ovhcloud.ai.training.CancelJob;
 import io.kestra.plugin.ovhcloud.ai.training.GetJob;
 import io.kestra.plugin.ovhcloud.ai.training.SubmitJob;
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 @KestraTest
 class AiTrainingAndDeployTest {
     @Inject
     private RunContextFactory runContextFactory;
 
-    @Test
-    void testComputeOvhSignature() {
-        String appSecret = "sec123";
-        String consumerKey = "ck456";
-        String method = "GET";
-        String url = "https://eu.api.ovh.com/1.0/cloud/project/p1/ai/job";
-        String body = "";
-        long timestamp = 1700000000L;
+    private static WireMockServer wireMockServer;
+    private static String testEndpoint;
 
-        String sig = AbstractOvhTask.computeOvhSignature(appSecret, consumerKey, method, url, body, timestamp);
-        assertThat(sig, startsWith("$1$"));
-        assertThat(sig.length(), is(43)); // "$1$" + 40 hex chars
+    @BeforeAll
+    static void startWireMock() {
+        wireMockServer = new WireMockServer(WireMockConfiguration.wireMockConfig().dynamicPort());
+        wireMockServer.start();
+        testEndpoint = "http://localhost:" + wireMockServer.port();
+    }
+
+    @AfterAll
+    static void stopWireMock() {
+        if (wireMockServer != null) {
+            wireMockServer.stop();
+        }
+    }
+
+    @BeforeEach
+    void resetWireMock() {
+        wireMockServer.resetAll();
     }
 
     @Test
-    void testSubmitJobOutput() {
-        SubmitJob.Output output = SubmitJob.Output.builder()
-            .jobId("job-ai-12345")
-            .status("QUEUED")
-            .createdAt("2026-10-13T10:00:00Z")
-            .url("https://dashboard.ovh.com/ai/job/job-ai-12345")
+    void testSubmitJobSuccess() throws Exception {
+        wireMockServer.stubFor(post(urlEqualTo("/v1/job"))
+            .willReturn(aResponse()
+                .withStatus(201)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                    {
+                      "id": "job-ai-12345",
+                      "status": {
+                        "state": "QUEUED"
+                      },
+                      "createdAt": "2026-10-16T12:00:00Z",
+                      "url": "https://dashboard.ovh.com/ai/job/job-ai-12345"
+                    }
+                    """)));
+
+        RunContext runContext = runContextFactory.of();
+        SubmitJob task = SubmitJob.builder()
+            .endpoint(Property.of(testEndpoint))
+            .token(Property.of("ovh-test-token-12345"))
+            .image(Property.of("pytorch/pytorch:2.3.0"))
+            .command(Property.of(List.of("python", "train.py")))
+            .name(Property.of("mnist-classifier"))
+            .gpu(Property.of(1))
+            .gpuModel(Property.of("Tesla-V100S"))
             .build();
+
+        SubmitJob.Output output = task.run(runContext);
 
         assertThat(output.getJobId(), is("job-ai-12345"));
         assertThat(output.getStatus(), is("QUEUED"));
-        assertThat(output.getCreatedAt(), is("2026-10-13T10:00:00Z"));
+        assertThat(output.getCreatedAt(), is(Instant.parse("2026-10-16T12:00:00Z")));
         assertThat(output.getUrl(), is("https://dashboard.ovh.com/ai/job/job-ai-12345"));
+
+        wireMockServer.verify(postRequestedFor(urlEqualTo("/v1/job"))
+            .withHeader("Authorization", equalTo("Bearer ovh-test-token-12345"))
+            .withHeader("Accept", equalTo("application/json"))
+            .withHeader("Content-Type", equalTo("application/json"))
+            .withRequestBody(equalToJson("""
+                {
+                  "image": "pytorch/pytorch:2.3.0",
+                  "command": ["python", "train.py"],
+                  "name": "mnist-classifier",
+                  "resources": {
+                    "gpu": 1,
+                    "gpuModel": "Tesla-V100S"
+                  }
+                }
+                """)));
     }
 
     @Test
-    void testGetJobOutput() {
-        GetJob.Output output = GetJob.Output.builder()
-            .jobId("job-ai-12345")
-            .status("DONE")
-            .createdAt("2026-10-13T10:00:00Z")
-            .startDate("2026-10-13T10:01:00Z")
-            .endDate("2026-10-13T10:30:00Z")
-            .exitCode(0)
+    void testGetJobSuccess() throws Exception {
+        wireMockServer.stubFor(get(urlEqualTo("/v1/job/job-ai-12345"))
+            .willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                    {
+                      "id": "job-ai-12345",
+                      "status": {
+                        "state": "DONE",
+                        "exitCode": 0
+                      },
+                      "createdAt": "2026-10-16T12:00:00Z",
+                      "startDate": "2026-10-16T12:01:00Z",
+                      "endDate": "2026-10-16T12:30:00Z",
+                      "url": "https://dashboard.ovh.com/ai/job/job-ai-12345"
+                    }
+                    """)));
+
+        RunContext runContext = runContextFactory.of();
+        GetJob task = GetJob.builder()
+            .endpoint(Property.of(testEndpoint))
+            .token(Property.of("ovh-test-token-12345"))
+            .jobId(Property.of("job-ai-12345"))
             .build();
+
+        GetJob.Output output = task.run(runContext);
 
         assertThat(output.getJobId(), is("job-ai-12345"));
         assertThat(output.getStatus(), is("DONE"));
         assertThat(output.getExitCode(), is(0));
+        assertThat(output.getCreatedAt(), is(Instant.parse("2026-10-16T12:00:00Z")));
+        assertThat(output.getStartDate(), is(Instant.parse("2026-10-16T12:01:00Z")));
+        assertThat(output.getEndDate(), is(Instant.parse("2026-10-16T12:30:00Z")));
+        assertThat(output.getUrl(), is("https://dashboard.ovh.com/ai/job/job-ai-12345"));
+
+        wireMockServer.verify(getRequestedFor(urlEqualTo("/v1/job/job-ai-12345"))
+            .withHeader("Authorization", equalTo("Bearer ovh-test-token-12345")));
     }
 
     @Test
-    void testCancelJobOutput() {
-        CancelJob.Output output = CancelJob.Output.builder()
-            .jobId("job-ai-12345")
-            .cancelled(true)
+    void testCancelJobSuccess() throws Exception {
+        wireMockServer.stubFor(put(urlEqualTo("/v1/job/job-ai-12345/kill"))
+            .willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("{}")));
+
+        RunContext runContext = runContextFactory.of();
+        CancelJob task = CancelJob.builder()
+            .endpoint(Property.of(testEndpoint))
+            .token(Property.of("ovh-test-token-12345"))
+            .jobId(Property.of("job-ai-12345"))
             .build();
+
+        CancelJob.Output output = task.run(runContext);
 
         assertThat(output.getJobId(), is("job-ai-12345"));
+        assertThat(output.getKilled(), is(true));
         assertThat(output.getCancelled(), is(true));
+
+        wireMockServer.verify(putRequestedFor(urlEqualTo("/v1/job/job-ai-12345/kill"))
+            .withHeader("Authorization", equalTo("Bearer ovh-test-token-12345")));
     }
 
     @Test
-    void testCreateAppOutput() {
-        CreateApp.Output output = CreateApp.Output.builder()
-            .appId("app-serving-789")
-            .status("RUNNING")
-            .url("https://app-serving-789.ai.gra.cloud.ovh.net")
+    void testCreateAppSuccess() throws Exception {
+        wireMockServer.stubFor(post(urlEqualTo("/v1/app"))
+            .willReturn(aResponse()
+                .withStatus(201)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                    {
+                      "id": "app-serving-789",
+                      "status": {
+                        "state": "SCALING"
+                      },
+                      "url": "https://app-serving-789.ai.gra.cloud.ovh.net",
+                      "createdAt": "2026-10-16T12:00:00Z"
+                    }
+                    """)));
+
+        RunContext runContext = runContextFactory.of();
+        CreateApp task = CreateApp.builder()
+            .endpoint(Property.of(testEndpoint))
+            .token(Property.of("ovh-test-token-12345"))
+            .image(Property.of("fraud-detector:v1"))
+            .name(Property.of("fraud-detector-api"))
+            .cpu(Property.of(2))
             .build();
 
+        CreateApp.Output output = task.run(runContext);
+
         assertThat(output.getAppId(), is("app-serving-789"));
+        assertThat(output.getStatus(), is("SCALING"));
+        assertThat(output.getUrl(), is("https://app-serving-789.ai.gra.cloud.ovh.net"));
+        assertThat(output.getCreatedAt(), is(Instant.parse("2026-10-16T12:00:00Z")));
+
+        wireMockServer.verify(postRequestedFor(urlEqualTo("/v1/app"))
+            .withHeader("Authorization", equalTo("Bearer ovh-test-token-12345"))
+            .withHeader("Content-Type", equalTo("application/json"))
+            .withRequestBody(equalToJson("""
+                {
+                  "image": "fraud-detector:v1",
+                  "name": "fraud-detector-api",
+                  "resources": {
+                    "cpu": 2
+                  }
+                }
+                """)));
+    }
+
+    @Test
+    void testGetAppSuccess() throws Exception {
+        wireMockServer.stubFor(get(urlEqualTo("/v1/app/app-serving-789"))
+            .willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                    {
+                      "id": "app-serving-789",
+                      "name": "fraud-detector-api",
+                      "status": {
+                        "state": "RUNNING"
+                      },
+                      "url": "https://app-serving-789.ai.gra.cloud.ovh.net",
+                      "createdAt": "2026-10-16T12:00:00Z",
+                      "updatedAt": "2026-10-16T12:10:00Z"
+                    }
+                    """)));
+
+        RunContext runContext = runContextFactory.of();
+        GetApp task = GetApp.builder()
+            .endpoint(Property.of(testEndpoint))
+            .token(Property.of("ovh-test-token-12345"))
+            .appId(Property.of("app-serving-789"))
+            .build();
+
+        GetApp.Output output = task.run(runContext);
+
+        assertThat(output.getAppId(), is("app-serving-789"));
+        assertThat(output.getName(), is("fraud-detector-api"));
         assertThat(output.getStatus(), is("RUNNING"));
         assertThat(output.getUrl(), is("https://app-serving-789.ai.gra.cloud.ovh.net"));
+        assertThat(output.getCreatedAt(), is(Instant.parse("2026-10-16T12:00:00Z")));
+        assertThat(output.getUpdatedAt(), is(Instant.parse("2026-10-16T12:10:00Z")));
+
+        wireMockServer.verify(getRequestedFor(urlEqualTo("/v1/app/app-serving-789"))
+            .withHeader("Authorization", equalTo("Bearer ovh-test-token-12345")));
     }
 
     @Test
-    void testGetAppOutput() {
-        GetApp.Output output = GetApp.Output.builder()
-            .appId("app-serving-789")
-            .name("fraud-detector")
-            .status("RUNNING")
-            .url("https://app-serving-789.ai.gra.cloud.ovh.net")
+    void testDeleteAppSuccess() throws Exception {
+        wireMockServer.stubFor(delete(urlEqualTo("/v1/app/app-serving-789"))
+            .willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("{}")));
+
+        RunContext runContext = runContextFactory.of();
+        DeleteApp task = DeleteApp.builder()
+            .endpoint(Property.of(testEndpoint))
+            .token(Property.of("ovh-test-token-12345"))
+            .appId(Property.of("app-serving-789"))
             .build();
 
-        assertThat(output.getAppId(), is("app-serving-789"));
-        assertThat(output.getName(), is("fraud-detector"));
-        assertThat(output.getStatus(), is("RUNNING"));
-    }
-
-    @Test
-    void testDeleteAppOutput() {
-        DeleteApp.Output output = DeleteApp.Output.builder()
-            .appId("app-serving-789")
-            .deleted(true)
-            .build();
+        DeleteApp.Output output = task.run(runContext);
 
         assertThat(output.getAppId(), is("app-serving-789"));
         assertThat(output.getDeleted(), is(true));
+
+        wireMockServer.verify(deleteRequestedFor(urlEqualTo("/v1/app/app-serving-789"))
+            .withHeader("Authorization", equalTo("Bearer ovh-test-token-12345")));
+    }
+
+    @Test
+    void testNon2xxErrorThrowsException() {
+        wireMockServer.stubFor(get(urlEqualTo("/v1/job/non-existent-job"))
+            .willReturn(aResponse()
+                .withStatus(404)
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"message\":\"Job not found\"}")));
+
+        RunContext runContext = runContextFactory.of();
+        GetJob task = GetJob.builder()
+            .endpoint(Property.of(testEndpoint))
+            .token(Property.of("ovh-test-token-12345"))
+            .jobId(Property.of("non-existent-job"))
+            .build();
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> task.run(runContext));
+        assertThat(ex.getMessage(), containsString("404"));
+        assertThat(ex.getMessage(), containsString("Job not found"));
+    }
+
+    @Test
+    void testMissingIdInResponseThrows() {
+        wireMockServer.stubFor(get(urlEqualTo("/v1/job/corrupt-job"))
+            .willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"status\":\"DONE\"}")));
+
+        RunContext runContext = runContextFactory.of();
+        GetJob task = GetJob.builder()
+            .endpoint(Property.of(testEndpoint))
+            .token(Property.of("ovh-test-token-12345"))
+            .jobId(Property.of("corrupt-job"))
+            .build();
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> task.run(runContext));
+        assertThat(ex.getMessage(), containsString("missing required 'id' property"));
+    }
+
+    @Test
+    void testEmptyResponseBodyThrows() {
+        wireMockServer.stubFor(get(urlEqualTo("/v1/job/empty-job"))
+            .willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("   ")));
+
+        RunContext runContext = runContextFactory.of();
+        GetJob task = GetJob.builder()
+            .endpoint(Property.of(testEndpoint))
+            .token(Property.of("ovh-test-token-12345"))
+            .jobId(Property.of("empty-job"))
+            .build();
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> task.run(runContext));
+        assertThat(ex.getMessage(), containsString("response body is empty"));
+    }
+
+    @Test
+    void testMalformedTimestampHandledSafely() throws Exception {
+        wireMockServer.stubFor(get(urlEqualTo("/v1/job/malformed-date-job"))
+            .willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                    {
+                      "id": "job-bad-date",
+                      "status": "DONE",
+                      "createdAt": "not-a-valid-iso-date"
+                    }
+                    """)));
+
+        RunContext runContext = runContextFactory.of();
+        GetJob task = GetJob.builder()
+            .endpoint(Property.of(testEndpoint))
+            .token(Property.of("ovh-test-token-12345"))
+            .jobId(Property.of("malformed-date-job"))
+            .build();
+
+        GetJob.Output output = task.run(runContext);
+        assertThat(output.getJobId(), is("job-bad-date"));
+        assertThat(output.getStatus(), is("DONE"));
+        assertNull(output.getCreatedAt());
     }
 
     @Test
     void testPropertyRendering() throws Exception {
         RunContext runContext = runContextFactory.of(Map.of(
-            "pId", "proj-999",
+            "tok", "ovh-rendered-token-999",
             "img", "pytorch/pytorch:2.3.0",
             "jName", "mnist-classifier"
         ));
 
         SubmitJob task = SubmitJob.builder()
-            .applicationKey(Property.of("app-key-test"))
-            .applicationSecret(Property.of("app-secret-test"))
-            .consumerKey(Property.of("consumer-key-test"))
-            .projectId(Property.ofExpression("{{ pId }}"))
+            .token(Property.ofExpression("{{ tok }}"))
             .image(Property.ofExpression("{{ img }}"))
             .name(Property.ofExpression("{{ jName }}"))
             .command(Property.of(List.of("python", "train.py")))
@@ -140,7 +382,7 @@ class AiTrainingAndDeployTest {
             .gpuModel(Property.of("Tesla-V100S"))
             .build();
 
-        assertThat(runContext.render(task.getProjectId()).as(String.class).orElse(null), is("proj-999"));
+        assertThat(runContext.render(task.getToken()).as(String.class).orElse(null), is("ovh-rendered-token-999"));
         assertThat(runContext.render(task.getImage()).as(String.class).orElse(null), is("pytorch/pytorch:2.3.0"));
         assertThat(runContext.render(task.getName()).as(String.class).orElse(null), is("mnist-classifier"));
         assertThat(runContext.render(task.getGpu()).as(Integer.class).orElse(null), is(1));
@@ -152,14 +394,52 @@ class AiTrainingAndDeployTest {
 
         GetJob task = GetJob.builder()
             .endpoint(Property.of("http://evil-attacker.com/api"))
-            .applicationKey(Property.of("key"))
-            .applicationSecret(Property.of("sec"))
-            .consumerKey(Property.of("ck"))
-            .projectId(Property.of("p1"))
+            .token(Property.of("key"))
             .jobId(Property.of("j1"))
             .build();
 
         assertThrows(IllegalArgumentException.class, () -> task.run(runContext));
+    }
+
+    @Test
+    void testEndpointUserInfoRejection() {
+        RunContext runContext = runContextFactory.of();
+
+        GetJob task = GetJob.builder()
+            .endpoint(Property.of("https://user:pass@gra.training.ai.cloud.ovh.net"))
+            .token(Property.of("key"))
+            .jobId(Property.of("j1"))
+            .build();
+
+        assertThrows(IllegalArgumentException.class, () -> task.run(runContext));
+    }
+
+    @Test
+    void testAllowedHostsStrictness() {
+        assertThat(AbstractOvhTask.isAllowedHost("gra.training.ai.cloud.ovh.net"), is(true));
+        assertThat(AbstractOvhTask.isAllowedHost("sbg.training.ai.cloud.ovh.net"), is(true));
+        assertThat(AbstractOvhTask.isAllowedHost("bhs.training.ai.cloud.ovh.net"), is(true));
+        assertThat(AbstractOvhTask.isAllowedHost("rbx.training.ai.cloud.ovh.net"), is(true));
+        assertThat(AbstractOvhTask.isAllowedHost("gra.deploy.ai.cloud.ovh.net"), is(true));
+        assertThat(AbstractOvhTask.isAllowedHost("sbg.deploy.ai.cloud.ovh.net"), is(true));
+        assertThat(AbstractOvhTask.isAllowedHost("bhs.deploy.ai.cloud.ovh.net"), is(true));
+        assertThat(AbstractOvhTask.isAllowedHost("rbx.deploy.ai.cloud.ovh.net"), is(true));
+        assertThat(AbstractOvhTask.isAllowedHost("api.ai.cloud.ovh.net"), is(true));
+        assertThat(AbstractOvhTask.isAllowedHost("localhost"), is(true));
+        assertThat(AbstractOvhTask.isAllowedHost("127.0.0.1"), is(true));
+        assertThat(AbstractOvhTask.isAllowedHost("::1"), is(true));
+        assertThat(AbstractOvhTask.isAllowedHost("[::1]"), is(true));
+
+        // Legacy core endpoints must be rejected for AI Bearer tokens
+        assertThat(AbstractOvhTask.isAllowedHost("eu.api.ovh.com"), is(false));
+        assertThat(AbstractOvhTask.isAllowedHost("ca.api.ovh.com"), is(false));
+
+        // Unauthorized / attacker domains must be rejected
+        assertThat(AbstractOvhTask.isAllowedHost("attacker.com"), is(false));
+        assertThat(AbstractOvhTask.isAllowedHost("unauthorized.training.ai.cloud.ovh.net"), is(false));
+        assertThat(AbstractOvhTask.isAllowedHost("gra.training.ai.cloud.ovh.net.evil.com"), is(false));
+        assertThat(AbstractOvhTask.isAllowedHost("localhost.attacker.com"), is(false));
+        assertThat(AbstractOvhTask.isAllowedHost(null), is(false));
     }
 
     @Test
@@ -177,66 +457,175 @@ class AiTrainingAndDeployTest {
     }
 
     @Test
-    void testCreateAppCpuAndMemoryBounds() {
+    void testCreateAppResourceBounds() {
         RunContext runContext = runContextFactory.of();
 
         CreateApp zeroCpu = CreateApp.builder()
-            .projectId(Property.of("p1"))
+            .token(Property.of("key"))
             .image(Property.of("img:latest"))
             .cpu(Property.of(0))
             .build();
         assertThrows(IllegalArgumentException.class, () -> zeroCpu.run(runContext));
 
         CreateApp excessiveCpu = CreateApp.builder()
-            .projectId(Property.of("p1"))
+            .token(Property.of("key"))
             .image(Property.of("img:latest"))
-            .cpu(Property.of(512))
+            .cpu(Property.of(13))
             .build();
         assertThrows(IllegalArgumentException.class, () -> excessiveCpu.run(runContext));
 
-        CreateApp zeroMemory = CreateApp.builder()
-            .projectId(Property.of("p1"))
+        CreateApp excessiveGpu = CreateApp.builder()
+            .token(Property.of("key"))
             .image(Property.of("img:latest"))
-            .memory(Property.of(0))
+            .gpu(Property.of(5))
             .build();
-        assertThrows(IllegalArgumentException.class, () -> zeroMemory.run(runContext));
+        assertThrows(IllegalArgumentException.class, () -> excessiveGpu.run(runContext));
 
-        CreateApp excessiveMemory = CreateApp.builder()
-            .projectId(Property.of("p1"))
+        CreateApp conflictingResources = CreateApp.builder()
+            .token(Property.of("key"))
             .image(Property.of("img:latest"))
-            .memory(Property.of(4096))
+            .cpu(Property.of(2))
+            .gpu(Property.of(1))
             .build();
-        assertThrows(IllegalArgumentException.class, () -> excessiveMemory.run(runContext));
+        assertThrows(IllegalArgumentException.class, () -> conflictingResources.run(runContext));
     }
 
     @Test
-    void testSubmitJobGpuBounds() {
+    void testSubmitJobResourceBounds() {
         RunContext runContext = runContextFactory.of();
 
         SubmitJob negativeGpu = SubmitJob.builder()
-            .projectId(Property.of("p1"))
+            .token(Property.of("key"))
             .image(Property.of("img:latest"))
             .gpu(Property.of(-1))
             .build();
         assertThrows(IllegalArgumentException.class, () -> negativeGpu.run(runContext));
 
         SubmitJob excessiveGpu = SubmitJob.builder()
-            .projectId(Property.of("p1"))
+            .token(Property.of("key"))
             .image(Property.of("img:latest"))
-            .gpu(Property.of(16))
+            .gpu(Property.of(5))
             .build();
         assertThrows(IllegalArgumentException.class, () -> excessiveGpu.run(runContext));
+
+        SubmitJob zeroCpu = SubmitJob.builder()
+            .token(Property.of("key"))
+            .image(Property.of("img:latest"))
+            .cpu(Property.of(0))
+            .build();
+        assertThrows(IllegalArgumentException.class, () -> zeroCpu.run(runContext));
+
+        SubmitJob excessiveCpu = SubmitJob.builder()
+            .token(Property.of("key"))
+            .image(Property.of("img:latest"))
+            .cpu(Property.of(13))
+            .build();
+        assertThrows(IllegalArgumentException.class, () -> excessiveCpu.run(runContext));
+
+        SubmitJob conflictingResources = SubmitJob.builder()
+            .token(Property.of("key"))
+            .image(Property.of("img:latest"))
+            .cpu(Property.of(2))
+            .gpu(Property.of(1))
+            .build();
+        assertThrows(IllegalArgumentException.class, () -> conflictingResources.run(runContext));
     }
 
     @Test
-    void testMissingCredentialsThrows() {
+    void testSubmitJobCpuTrainingSuccess() throws Exception {
+        wireMockServer.stubFor(post(urlEqualTo("/v1/job"))
+            .willReturn(aResponse()
+                .withStatus(201)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                    {
+                      "id": "job-cpu-9999",
+                      "status": {
+                        "state": "QUEUED"
+                      },
+                      "createdAt": "2026-10-16T12:00:00Z"
+                    }
+                    """)));
+
+        RunContext runContext = runContextFactory.of();
+        SubmitJob task = SubmitJob.builder()
+            .endpoint(Property.of(testEndpoint))
+            .token(Property.of("ovh-test-token-12345"))
+            .image(Property.of("python:3.11-slim"))
+            .command(Property.of(List.of("python", "train_cpu.py")))
+            .name(Property.of("cpu-training-job"))
+            .cpu(Property.of(4))
+            .build();
+
+        SubmitJob.Output output = task.run(runContext);
+        assertThat(output.getJobId(), is("job-cpu-9999"));
+        assertThat(output.getStatus(), is("QUEUED"));
+
+        wireMockServer.verify(postRequestedFor(urlEqualTo("/v1/job"))
+            .withRequestBody(equalToJson("""
+                {
+                  "image": "python:3.11-slim",
+                  "command": ["python", "train_cpu.py"],
+                  "name": "cpu-training-job",
+                  "resources": {
+                    "cpu": 4
+                  }
+                }
+                """)));
+    }
+
+    @Test
+    void testCreateAppGpuServingSuccess() throws Exception {
+        wireMockServer.stubFor(post(urlEqualTo("/v1/app"))
+            .willReturn(aResponse()
+                .withStatus(201)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                    {
+                      "id": "app-gpu-5555",
+                      "status": {
+                        "state": "SCALING"
+                      },
+                      "url": "https://app-gpu-5555.ai.gra.cloud.ovh.net",
+                      "createdAt": "2026-10-16T12:00:00Z"
+                    }
+                    """)));
+
+        RunContext runContext = runContextFactory.of();
+        CreateApp task = CreateApp.builder()
+            .endpoint(Property.of(testEndpoint))
+            .token(Property.of("ovh-test-token-12345"))
+            .image(Property.of("vllm/vllm-openai:latest"))
+            .name(Property.of("llm-serving-app"))
+            .gpu(Property.of(2))
+            .gpuModel(Property.of("Tesla-V100S"))
+            .build();
+
+        CreateApp.Output output = task.run(runContext);
+        assertThat(output.getAppId(), is("app-gpu-5555"));
+        assertThat(output.getStatus(), is("SCALING"));
+
+        wireMockServer.verify(postRequestedFor(urlEqualTo("/v1/app"))
+            .withRequestBody(equalToJson("""
+                {
+                  "image": "vllm/vllm-openai:latest",
+                  "name": "llm-serving-app",
+                  "resources": {
+                    "gpu": 2,
+                    "gpuModel": "Tesla-V100S"
+                  }
+                }
+                """)));
+    }
+
+    @Test
+    void testMissingTokenThrows() {
         RunContext runContext = runContextFactory.of();
 
         GetJob task = GetJob.builder()
             .jobId(Property.of("00000000-0000-0000-0000-000000000000"))
             .build();
 
-        assertThrows(Exception.class, () -> task.run(runContext));
+        assertThrows(IllegalArgumentException.class, () -> task.run(runContext));
     }
 }
-

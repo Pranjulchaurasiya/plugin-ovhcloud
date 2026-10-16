@@ -1,8 +1,8 @@
 group: io.kestra.plugin.ovhcloud
 name: "ovhcloud"
-title: "OVH Cloud"
-description: "OVH Cloud plugin for Kestra"
-body: ""
+title: "OVHcloud"
+description: "OVHcloud plugin for Kestra with tasks for AI Training and AI Deploy."
+body: "Orchestrate machine learning workflows on OVHcloud AI Training and deploy serving containers on OVHcloud AI Deploy."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"
