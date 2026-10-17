@@ -9,7 +9,11 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.ovhcloud.AbstractOvhTask;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
-import lombok.*;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 @SuperBuilder
@@ -49,16 +53,11 @@ public class CancelJob extends AbstractOvhTask implements RunnableTask<CancelJob
     private Property<String> jobId;
 
     @Override
-    protected String defaultEndpoint() {
-        return "https://gra.training.ai.cloud.ovh.net";
-    }
-
-    @Override
     public Output run(RunContext runContext) throws Exception {
         String rJobId = runContext.render(this.jobId).as(String.class).orElseThrow();
         String path = "/v1/job/" + encodePath(rJobId) + "/kill";
 
-        HttpResponse res = this.executeOvhRequest(runContext, "PUT", path, null);
+        OvhResponse res = this.executeOvhRequest(runContext, "PUT", path, null);
         if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
             throw new RuntimeException("OVHcloud AI CancelJob failed with status " + res.getStatusCode() + ": " + res.getBody());
         }
@@ -77,10 +76,5 @@ public class CancelJob extends AbstractOvhTask implements RunnableTask<CancelJob
 
         @Schema(title = "Whether the cancellation or kill request was accepted successfully")
         private final Boolean killed;
-
-        @Schema(title = "Backward-compatible alias for killed")
-        public Boolean getCancelled() {
-            return killed;
-        }
     }
 }

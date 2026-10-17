@@ -10,7 +10,11 @@ import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.plugin.ovhcloud.AbstractOvhTask;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
-import lombok.*;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 import java.time.Instant;
@@ -52,16 +56,11 @@ public class GetApp extends AbstractOvhTask implements RunnableTask<GetApp.Outpu
     private Property<String> appId;
 
     @Override
-    protected String defaultEndpoint() {
-        return "https://gra.deploy.ai.cloud.ovh.net";
-    }
-
-    @Override
     public Output run(RunContext runContext) throws Exception {
         String rAppId = runContext.render(this.appId).as(String.class).orElseThrow();
         String path = "/v1/app/" + encodePath(rAppId);
 
-        HttpResponse res = this.executeOvhRequest(runContext, "GET", path, null);
+        OvhResponse res = this.executeOvhRequest(runContext, "GET", path, null);
         if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
             throw new RuntimeException("OVHcloud AI GetApp failed with status " + res.getStatusCode() + ": " + res.getBody());
         }

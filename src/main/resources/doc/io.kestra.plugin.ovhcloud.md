@@ -1,16 +1,27 @@
-This is the Kestra plugin template. Use it as a starting point for building a new plugin.
+Integrate with OVHcloud to orchestrate machine learning workflows and model serving endpoints.
 
-## What this template ships
+The OVHcloud plugin provides tasks to interact with OVHcloud AI endpoints, allowing you to submit and manage AI training jobs and deploy AI model serving applications.
 
-- `Example` is a sample `RunnableTask` that reverses an input string.
-- `Trigger` is a sample polling trigger that fires an execution at random.
+## Authentication
 
-## How to build your plugin
+All tasks authenticate using an OVHcloud AI Bearer Token. Generate an AI token in the OVHcloud Manager or via the OVHcloud CLI, and pass it securely using Kestra secrets:
 
-1. Rename the package `io.kestra.plugin.ovhcloud` to your own, for example `io.kestra.plugin.myservice`.
-2. Update `group`, `name`, `title`, and `description` in `src/main/resources/metadata/index.yaml`.
-3. Replace `src/main/resources/icons/plugin-icon.svg` with your service's icon.
-4. Replace the `Example` and `Trigger` classes with your real tasks and triggers.
-5. Replace this how-to with documentation for your plugin.
+```yaml
+token: "{{ secret('OVH_AI_TOKEN') }}"
+```
 
-Run `./gradlew lintPluginDocs` before pushing to validate the plugin documentation.
+## AI Training Tasks
+
+- **SubmitJob**: Submit GPU or CPU AI/ML training jobs to OVHcloud AI Training.
+- **GetJob**: Retrieve details, execution status, and logs URL of an existing training job.
+- **CancelJob**: Cancel or kill an active training job.
+
+## AI Deploy Tasks
+
+- **CreateApp**: Deploy AI model serving container applications on OVHcloud AI Deploy.
+- **GetApp**: Retrieve the runtime status and public/private endpoint URL of a deployed serving application.
+- **DeleteApp**: Permanently terminate and remove a deployed serving application.
+
+## Endpoints
+
+Tasks connect to regional OVHcloud AI endpoints, defaulting to `https://gra.training.ai.cloud.ovh.net` (Gravelines, France) with support for `https://bhs.training.ai.cloud.ovh.net` (Beauharnois, Canada).

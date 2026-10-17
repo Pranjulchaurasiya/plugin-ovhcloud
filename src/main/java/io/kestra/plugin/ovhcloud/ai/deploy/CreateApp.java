@@ -12,7 +12,11 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
-import lombok.*;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 import java.time.Instant;
@@ -90,11 +94,6 @@ public class CreateApp extends AbstractOvhTask implements RunnableTask<CreateApp
     private Property<String> gpuModel;
 
     @Override
-    protected String defaultEndpoint() {
-        return "https://gra.deploy.ai.cloud.ovh.net";
-    }
-
-    @Override
     public Output run(RunContext runContext) throws Exception {
         String rImage = runContext.render(this.image).as(String.class).orElseThrow();
         String rName = runContext.render(this.name).as(String.class).orElse(null);
@@ -133,7 +132,7 @@ public class CreateApp extends AbstractOvhTask implements RunnableTask<CreateApp
         payload.put("resources", resources);
 
         String jsonPayload = JacksonMapper.ofJson().writeValueAsString(payload);
-        HttpResponse res = this.executeOvhRequest(runContext, "POST", "/v1/app", jsonPayload);
+        OvhResponse res = this.executeOvhRequest(runContext, "POST", "/v1/app", jsonPayload);
         if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
             throw new RuntimeException("OVHcloud AI CreateApp failed with status " + res.getStatusCode() + ": " + res.getBody());
         }

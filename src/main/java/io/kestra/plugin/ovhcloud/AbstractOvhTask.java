@@ -1,6 +1,7 @@
 package io.kestra.plugin.ovhcloud;
 
 import io.kestra.core.http.HttpRequest;
+import io.kestra.core.http.HttpResponse;
 import io.kestra.core.http.client.HttpClient;
 import io.kestra.core.http.client.HttpClientResponseException;
 import io.kestra.core.http.client.configurations.BearerAuthConfiguration;
@@ -11,7 +12,12 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 import java.net.URI;
@@ -27,16 +33,11 @@ import java.util.Set;
 @Getter
 @NoArgsConstructor
 public abstract class AbstractOvhTask extends Task {
+    public static final String DEFAULT_AI_ENDPOINT = "https://gra.training.ai.cloud.ovh.net";
+
     public static final Set<String> ALLOWED_AI_HOSTS = Set.of(
-        "api.ai.cloud.ovh.net",
         "gra.training.ai.cloud.ovh.net",
-        "sbg.training.ai.cloud.ovh.net",
-        "bhs.training.ai.cloud.ovh.net",
-        "rbx.training.ai.cloud.ovh.net",
-        "gra.deploy.ai.cloud.ovh.net",
-        "sbg.deploy.ai.cloud.ovh.net",
-        "bhs.deploy.ai.cloud.ovh.net",
-        "rbx.deploy.ai.cloud.ovh.net"
+        "bhs.training.ai.cloud.ovh.net"
     );
 
     public static final Set<String> LOOPBACK_HOSTS = Set.of(
@@ -48,10 +49,11 @@ public abstract class AbstractOvhTask extends Task {
 
     @Schema(
         title = "The OVHcloud AI API endpoint URL",
-        description = "Regional data-plane endpoint URL (e.g. 'https://gra.training.ai.cloud.ovh.net' for training or 'https://gra.deploy.ai.cloud.ovh.net' for deploy)."
+        description = "Regional data-plane endpoint URL. Defaults to 'https://gra.training.ai.cloud.ovh.net' (supported regions: GRA, BHS)."
     )
+    @Builder.Default
     @PluginProperty(group = "connection")
-    protected Property<String> endpoint;
+    protected Property<String> endpoint = Property.ofValue(DEFAULT_AI_ENDPOINT);
 
     @Schema(
         title = "The OVHcloud AI Bearer token",
@@ -63,17 +65,12 @@ public abstract class AbstractOvhTask extends Task {
     @PluginProperty(group = "connection", secret = true)
     protected Property<String> token;
 
-    @Schema(
-        title = "The OVH Public Cloud project ID (serviceName)",
-        description = "Optional Public Cloud project identifier."
-    )
-    @PluginProperty(group = "main")
-    protected Property<String> projectId;
-
-    protected abstract String defaultEndpoint();
+    public String defaultEndpoint() {
+        return DEFAULT_AI_ENDPOINT;
+    }
 
     /**
-     * URL-encodes a single path segment and guards against dot-segment path traversal (e.g. '.', '..').
+     * Strictly URL-encodes path segments and forbids traversal components ('.', '..', slashes).
      */
     public static String encodePath(String segment) {
         if (segment == null || segment.isBlank()) {
@@ -114,7 +111,7 @@ public abstract class AbstractOvhTask extends Task {
         }
     }
 
-    protected HttpResponse executeOvhRequest(RunContext runContext, String method, String path, String body) throws Exception {
+    protected OvhResponse executeOvhRequest(RunContext runContext, String method, String path, String body) throws Exception {
         if (this.token == null) {
             throw new IllegalArgumentException("The 'token' property is required for OVHcloud AI authentication.");
         }
@@ -123,30 +120,29 @@ public abstract class AbstractOvhTask extends Task {
         if (rEndpoint == null || rEndpoint.isBlank()) {
             rEndpoint = defaultEndpoint();
         }
-        rEndpoint = rEndpoint.trim();
 
         URI parsedUri = URI.create(rEndpoint);
         if (parsedUri.getUserInfo() != null) {
-            throw new IllegalArgumentException("Insecure endpoint rejected: user-info in endpoint URL is not permitted");
+            throw new IllegalArgumentException("Endpoint must not contain userinfo/credentials (received: " + rEndpoint + ")");
         }
 
         String host = parsedUri.getHost();
+        if (host == null || !isAllowedHost(host)) {
+            throw new IllegalArgumentException("Endpoint host '" + host + "' is not a recognized OVHcloud AI data-plane host or local test host.");
+        }
+
         String scheme = parsedUri.getScheme();
-        boolean isLoopback = host != null && LOOPBACK_HOSTS.contains(host.toLowerCase(Locale.ROOT));
-        boolean allowedHost = isAllowedHost(host);
+        if (!"https".equalsIgnoreCase(scheme)) {
+            if (!LOOPBACK_HOSTS.contains(host.toLowerCase(Locale.ROOT))) {
+                throw new IllegalArgumentException("Insecure HTTP endpoint is only permitted for loopback testing. Received scheme '" + scheme + "' for host: " + host);
+            }
+        }
+
         int port = parsedUri.getPort();
-        boolean isStandardHttpsPort = (port == -1 || port == 443);
-
-        if (!("https".equalsIgnoreCase(scheme) && allowedHost && isStandardHttpsPort) && !("http".equalsIgnoreCase(scheme) && isLoopback)) {
-            throw new IllegalArgumentException(
-                "Insecure or unrecognised OVHcloud AI endpoint rejected. Host must be one of " + ALLOWED_AI_HOSTS
-                + " over HTTPS (port 443), or localhost/127.0.0.1/[::1] over HTTP for testing."
-            );
+        if (port != -1 && port != 443 && !LOOPBACK_HOSTS.contains(host.toLowerCase(Locale.ROOT))) {
+            throw new IllegalArgumentException("Custom ports are not permitted for cloud endpoints. Port must be 443 or omitted. Received: " + port);
         }
 
-        if (rEndpoint.endsWith("/")) {
-            rEndpoint = rEndpoint.substring(0, rEndpoint.length() - 1);
-        }
         String fullUrl = rEndpoint + (path.startsWith("/") ? path : "/" + path);
 
         BearerAuthConfiguration authConfig = BearerAuthConfiguration.builder()
@@ -155,7 +151,7 @@ public abstract class AbstractOvhTask extends Task {
 
         HttpConfiguration httpConfig = HttpConfiguration.builder()
             .auth(authConfig)
-            .allowFailed(Property.of(true))
+            .allowFailed(Property.ofValue(true))
             .build();
 
         HttpRequest.HttpRequestBuilder reqBuilder = HttpRequest.builder()
@@ -174,12 +170,12 @@ public abstract class AbstractOvhTask extends Task {
 
         try (HttpClient client = new HttpClient(runContext, httpConfig)) {
             try {
-                io.kestra.core.http.HttpResponse<String> response = client.request(reqBuilder.build(), String.class);
-                return new HttpResponse(response.getStatus().getCode(), response.getBody() != null ? response.getBody() : "");
+                HttpResponse<String> response = client.request(reqBuilder.build(), String.class);
+                return new OvhResponse(response.getStatus().getCode(), response.getBody() != null ? response.getBody() : "");
             } catch (HttpClientResponseException e) {
                 if (e.getResponse() != null) {
                     Object respBody = e.getResponse().getBody();
-                    return new HttpResponse(e.getResponse().getStatus().getCode(), respBody != null ? respBody.toString() : "");
+                    return new OvhResponse(e.getResponse().getStatus().getCode(), respBody != null ? respBody.toString() : "");
                 }
                 throw e;
             }
@@ -188,7 +184,7 @@ public abstract class AbstractOvhTask extends Task {
 
     @AllArgsConstructor
     @Getter
-    public static class HttpResponse {
+    public static class OvhResponse {
         private final int statusCode;
         private final String body;
     }

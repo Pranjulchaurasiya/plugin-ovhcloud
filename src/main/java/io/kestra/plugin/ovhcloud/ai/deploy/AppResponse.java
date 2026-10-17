@@ -5,7 +5,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.kestra.plugin.ovhcloud.AbstractOvhTask;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
@@ -41,6 +44,13 @@ public class AppResponse {
         return AbstractOvhTask.parseInstantSafe(updatedAt);
     }
 
+    public String getUrl() {
+        if (status != null && status.getUrl() != null && !status.getUrl().isBlank()) {
+            return status.getUrl();
+        }
+        return url;
+    }
+
     public String getState() {
         return status != null && status.getState() != null ? status.getState() : "UNKNOWN";
     }
@@ -54,6 +64,9 @@ public class AppResponse {
         @JsonProperty("state")
         private String state;
 
+        @JsonProperty("url")
+        private String url;
+
         @JsonCreator
         public static AppStatus fromJson(JsonNode node) {
             if (node == null || node.isNull()) {
@@ -63,7 +76,8 @@ public class AppResponse {
                 return AppStatus.builder().state(node.asText()).build();
             }
             String state = node.hasNonNull("state") ? node.get("state").asText() : null;
-            return AppStatus.builder().state(state).build();
+            String url = node.hasNonNull("url") ? node.get("url").asText() : null;
+            return AppStatus.builder().state(state).url(url).build();
         }
     }
 }

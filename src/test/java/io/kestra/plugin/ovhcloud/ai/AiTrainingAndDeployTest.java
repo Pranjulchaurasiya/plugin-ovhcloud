@@ -71,13 +71,13 @@ class AiTrainingAndDeployTest {
 
         RunContext runContext = runContextFactory.of();
         SubmitJob task = SubmitJob.builder()
-            .endpoint(Property.of(testEndpoint))
-            .token(Property.of("ovh-test-token-12345"))
-            .image(Property.of("pytorch/pytorch:2.3.0"))
-            .command(Property.of(List.of("python", "train.py")))
-            .name(Property.of("mnist-classifier"))
-            .gpu(Property.of(1))
-            .gpuModel(Property.of("Tesla-V100S"))
+            .endpoint(Property.ofValue(testEndpoint))
+            .token(Property.ofValue("ovh-test-token-12345"))
+            .image(Property.ofValue("pytorch/pytorch:2.3.0"))
+            .command(Property.ofValue(List.of("python", "train.py")))
+            .name(Property.ofValue("mnist-classifier"))
+            .gpu(Property.ofValue(1))
+            .gpuModel(Property.ofValue("Tesla-V100S"))
             .build();
 
         SubmitJob.Output output = task.run(runContext);
@@ -126,9 +126,9 @@ class AiTrainingAndDeployTest {
 
         RunContext runContext = runContextFactory.of();
         GetJob task = GetJob.builder()
-            .endpoint(Property.of(testEndpoint))
-            .token(Property.of("ovh-test-token-12345"))
-            .jobId(Property.of("job-ai-12345"))
+            .endpoint(Property.ofValue(testEndpoint))
+            .token(Property.ofValue("ovh-test-token-12345"))
+            .jobId(Property.ofValue("job-ai-12345"))
             .build();
 
         GetJob.Output output = task.run(runContext);
@@ -155,16 +155,15 @@ class AiTrainingAndDeployTest {
 
         RunContext runContext = runContextFactory.of();
         CancelJob task = CancelJob.builder()
-            .endpoint(Property.of(testEndpoint))
-            .token(Property.of("ovh-test-token-12345"))
-            .jobId(Property.of("job-ai-12345"))
+            .endpoint(Property.ofValue(testEndpoint))
+            .token(Property.ofValue("ovh-test-token-12345"))
+            .jobId(Property.ofValue("job-ai-12345"))
             .build();
 
         CancelJob.Output output = task.run(runContext);
 
         assertThat(output.getJobId(), is("job-ai-12345"));
         assertThat(output.getKilled(), is(true));
-        assertThat(output.getCancelled(), is(true));
 
         wireMockServer.verify(putRequestedFor(urlEqualTo("/v1/job/job-ai-12345/kill"))
             .withHeader("Authorization", equalTo("Bearer ovh-test-token-12345")));
@@ -189,11 +188,11 @@ class AiTrainingAndDeployTest {
 
         RunContext runContext = runContextFactory.of();
         CreateApp task = CreateApp.builder()
-            .endpoint(Property.of(testEndpoint))
-            .token(Property.of("ovh-test-token-12345"))
-            .image(Property.of("fraud-detector:v1"))
-            .name(Property.of("fraud-detector-api"))
-            .cpu(Property.of(2))
+            .endpoint(Property.ofValue(testEndpoint))
+            .token(Property.ofValue("ovh-test-token-12345"))
+            .image(Property.ofValue("fraud-detector:v1"))
+            .name(Property.ofValue("fraud-detector-api"))
+            .cpu(Property.ofValue(2))
             .build();
 
         CreateApp.Output output = task.run(runContext);
@@ -238,9 +237,9 @@ class AiTrainingAndDeployTest {
 
         RunContext runContext = runContextFactory.of();
         GetApp task = GetApp.builder()
-            .endpoint(Property.of(testEndpoint))
-            .token(Property.of("ovh-test-token-12345"))
-            .appId(Property.of("app-serving-789"))
+            .endpoint(Property.ofValue(testEndpoint))
+            .token(Property.ofValue("ovh-test-token-12345"))
+            .appId(Property.ofValue("app-serving-789"))
             .build();
 
         GetApp.Output output = task.run(runContext);
@@ -266,9 +265,9 @@ class AiTrainingAndDeployTest {
 
         RunContext runContext = runContextFactory.of();
         DeleteApp task = DeleteApp.builder()
-            .endpoint(Property.of(testEndpoint))
-            .token(Property.of("ovh-test-token-12345"))
-            .appId(Property.of("app-serving-789"))
+            .endpoint(Property.ofValue(testEndpoint))
+            .token(Property.ofValue("ovh-test-token-12345"))
+            .appId(Property.ofValue("app-serving-789"))
             .build();
 
         DeleteApp.Output output = task.run(runContext);
@@ -290,9 +289,9 @@ class AiTrainingAndDeployTest {
 
         RunContext runContext = runContextFactory.of();
         GetJob task = GetJob.builder()
-            .endpoint(Property.of(testEndpoint))
-            .token(Property.of("ovh-test-token-12345"))
-            .jobId(Property.of("non-existent-job"))
+            .endpoint(Property.ofValue(testEndpoint))
+            .token(Property.ofValue("ovh-test-token-12345"))
+            .jobId(Property.ofValue("non-existent-job"))
             .build();
 
         RuntimeException ex = assertThrows(RuntimeException.class, () -> task.run(runContext));
@@ -310,9 +309,9 @@ class AiTrainingAndDeployTest {
 
         RunContext runContext = runContextFactory.of();
         GetJob task = GetJob.builder()
-            .endpoint(Property.of(testEndpoint))
-            .token(Property.of("ovh-test-token-12345"))
-            .jobId(Property.of("corrupt-job"))
+            .endpoint(Property.ofValue(testEndpoint))
+            .token(Property.ofValue("ovh-test-token-12345"))
+            .jobId(Property.ofValue("corrupt-job"))
             .build();
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, () -> task.run(runContext));
@@ -329,9 +328,9 @@ class AiTrainingAndDeployTest {
 
         RunContext runContext = runContextFactory.of();
         GetJob task = GetJob.builder()
-            .endpoint(Property.of(testEndpoint))
-            .token(Property.of("ovh-test-token-12345"))
-            .jobId(Property.of("empty-job"))
+            .endpoint(Property.ofValue(testEndpoint))
+            .token(Property.ofValue("ovh-test-token-12345"))
+            .jobId(Property.ofValue("empty-job"))
             .build();
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, () -> task.run(runContext));
@@ -354,9 +353,9 @@ class AiTrainingAndDeployTest {
 
         RunContext runContext = runContextFactory.of();
         GetJob task = GetJob.builder()
-            .endpoint(Property.of(testEndpoint))
-            .token(Property.of("ovh-test-token-12345"))
-            .jobId(Property.of("malformed-date-job"))
+            .endpoint(Property.ofValue(testEndpoint))
+            .token(Property.ofValue("ovh-test-token-12345"))
+            .jobId(Property.ofValue("malformed-date-job"))
             .build();
 
         GetJob.Output output = task.run(runContext);
@@ -377,9 +376,9 @@ class AiTrainingAndDeployTest {
             .token(Property.ofExpression("{{ tok }}"))
             .image(Property.ofExpression("{{ img }}"))
             .name(Property.ofExpression("{{ jName }}"))
-            .command(Property.of(List.of("python", "train.py")))
-            .gpu(Property.of(1))
-            .gpuModel(Property.of("Tesla-V100S"))
+            .command(Property.ofValue(List.of("python", "train.py")))
+            .gpu(Property.ofValue(1))
+            .gpuModel(Property.ofValue("Tesla-V100S"))
             .build();
 
         assertThat(runContext.render(task.getToken()).as(String.class).orElse(null), is("ovh-rendered-token-999"));
@@ -393,9 +392,9 @@ class AiTrainingAndDeployTest {
         RunContext runContext = runContextFactory.of();
 
         GetJob task = GetJob.builder()
-            .endpoint(Property.of("http://evil-attacker.com/api"))
-            .token(Property.of("key"))
-            .jobId(Property.of("j1"))
+            .endpoint(Property.ofValue("http://evil-attacker.com/api"))
+            .token(Property.ofValue("key"))
+            .jobId(Property.ofValue("j1"))
             .build();
 
         assertThrows(IllegalArgumentException.class, () -> task.run(runContext));
@@ -406,9 +405,9 @@ class AiTrainingAndDeployTest {
         RunContext runContext = runContextFactory.of();
 
         GetJob task = GetJob.builder()
-            .endpoint(Property.of("https://user:pass@gra.training.ai.cloud.ovh.net"))
-            .token(Property.of("key"))
-            .jobId(Property.of("j1"))
+            .endpoint(Property.ofValue("https://user:pass@gra.training.ai.cloud.ovh.net"))
+            .token(Property.ofValue("key"))
+            .jobId(Property.ofValue("j1"))
             .build();
 
         assertThrows(IllegalArgumentException.class, () -> task.run(runContext));
@@ -417,19 +416,15 @@ class AiTrainingAndDeployTest {
     @Test
     void testAllowedHostsStrictness() {
         assertThat(AbstractOvhTask.isAllowedHost("gra.training.ai.cloud.ovh.net"), is(true));
-        assertThat(AbstractOvhTask.isAllowedHost("sbg.training.ai.cloud.ovh.net"), is(true));
         assertThat(AbstractOvhTask.isAllowedHost("bhs.training.ai.cloud.ovh.net"), is(true));
-        assertThat(AbstractOvhTask.isAllowedHost("rbx.training.ai.cloud.ovh.net"), is(true));
-        assertThat(AbstractOvhTask.isAllowedHost("gra.deploy.ai.cloud.ovh.net"), is(true));
-        assertThat(AbstractOvhTask.isAllowedHost("sbg.deploy.ai.cloud.ovh.net"), is(true));
-        assertThat(AbstractOvhTask.isAllowedHost("bhs.deploy.ai.cloud.ovh.net"), is(true));
-        assertThat(AbstractOvhTask.isAllowedHost("rbx.deploy.ai.cloud.ovh.net"), is(true));
-        assertThat(AbstractOvhTask.isAllowedHost("api.ai.cloud.ovh.net"), is(true));
-        assertThat(AbstractOvhTask.isAllowedHost("localhost"), is(true));
-        assertThat(AbstractOvhTask.isAllowedHost("127.0.0.1"), is(true));
-        assertThat(AbstractOvhTask.isAllowedHost("::1"), is(true));
-        assertThat(AbstractOvhTask.isAllowedHost("[::1]"), is(true));
-
+        // Inactive / non-existent / unverified AI hosts must be rejected
+        assertThat(AbstractOvhTask.isAllowedHost("sbg.training.ai.cloud.ovh.net"), is(false));
+        assertThat(AbstractOvhTask.isAllowedHost("rbx.training.ai.cloud.ovh.net"), is(false));
+        assertThat(AbstractOvhTask.isAllowedHost("gra.deploy.ai.cloud.ovh.net"), is(false));
+        assertThat(AbstractOvhTask.isAllowedHost("sbg.deploy.ai.cloud.ovh.net"), is(false));
+        assertThat(AbstractOvhTask.isAllowedHost("bhs.deploy.ai.cloud.ovh.net"), is(false));
+        assertThat(AbstractOvhTask.isAllowedHost("rbx.deploy.ai.cloud.ovh.net"), is(false));
+        assertThat(AbstractOvhTask.isAllowedHost("api.ai.cloud.ovh.net"), is(false));
         // Legacy core endpoints must be rejected for AI Bearer tokens
         assertThat(AbstractOvhTask.isAllowedHost("eu.api.ovh.com"), is(false));
         assertThat(AbstractOvhTask.isAllowedHost("ca.api.ovh.com"), is(false));
@@ -461,31 +456,31 @@ class AiTrainingAndDeployTest {
         RunContext runContext = runContextFactory.of();
 
         CreateApp zeroCpu = CreateApp.builder()
-            .token(Property.of("key"))
-            .image(Property.of("img:latest"))
-            .cpu(Property.of(0))
+            .token(Property.ofValue("key"))
+            .image(Property.ofValue("img:latest"))
+            .cpu(Property.ofValue(0))
             .build();
         assertThrows(IllegalArgumentException.class, () -> zeroCpu.run(runContext));
 
         CreateApp excessiveCpu = CreateApp.builder()
-            .token(Property.of("key"))
-            .image(Property.of("img:latest"))
-            .cpu(Property.of(13))
+            .token(Property.ofValue("key"))
+            .image(Property.ofValue("img:latest"))
+            .cpu(Property.ofValue(13))
             .build();
         assertThrows(IllegalArgumentException.class, () -> excessiveCpu.run(runContext));
 
         CreateApp excessiveGpu = CreateApp.builder()
-            .token(Property.of("key"))
-            .image(Property.of("img:latest"))
-            .gpu(Property.of(5))
+            .token(Property.ofValue("key"))
+            .image(Property.ofValue("img:latest"))
+            .gpu(Property.ofValue(5))
             .build();
         assertThrows(IllegalArgumentException.class, () -> excessiveGpu.run(runContext));
 
         CreateApp conflictingResources = CreateApp.builder()
-            .token(Property.of("key"))
-            .image(Property.of("img:latest"))
-            .cpu(Property.of(2))
-            .gpu(Property.of(1))
+            .token(Property.ofValue("key"))
+            .image(Property.ofValue("img:latest"))
+            .cpu(Property.ofValue(2))
+            .gpu(Property.ofValue(1))
             .build();
         assertThrows(IllegalArgumentException.class, () -> conflictingResources.run(runContext));
     }
@@ -495,38 +490,38 @@ class AiTrainingAndDeployTest {
         RunContext runContext = runContextFactory.of();
 
         SubmitJob negativeGpu = SubmitJob.builder()
-            .token(Property.of("key"))
-            .image(Property.of("img:latest"))
-            .gpu(Property.of(-1))
+            .token(Property.ofValue("key"))
+            .image(Property.ofValue("img:latest"))
+            .gpu(Property.ofValue(-1))
             .build();
         assertThrows(IllegalArgumentException.class, () -> negativeGpu.run(runContext));
 
         SubmitJob excessiveGpu = SubmitJob.builder()
-            .token(Property.of("key"))
-            .image(Property.of("img:latest"))
-            .gpu(Property.of(5))
+            .token(Property.ofValue("key"))
+            .image(Property.ofValue("img:latest"))
+            .gpu(Property.ofValue(5))
             .build();
         assertThrows(IllegalArgumentException.class, () -> excessiveGpu.run(runContext));
 
         SubmitJob zeroCpu = SubmitJob.builder()
-            .token(Property.of("key"))
-            .image(Property.of("img:latest"))
-            .cpu(Property.of(0))
+            .token(Property.ofValue("key"))
+            .image(Property.ofValue("img:latest"))
+            .cpu(Property.ofValue(0))
             .build();
         assertThrows(IllegalArgumentException.class, () -> zeroCpu.run(runContext));
 
         SubmitJob excessiveCpu = SubmitJob.builder()
-            .token(Property.of("key"))
-            .image(Property.of("img:latest"))
-            .cpu(Property.of(13))
+            .token(Property.ofValue("key"))
+            .image(Property.ofValue("img:latest"))
+            .cpu(Property.ofValue(13))
             .build();
         assertThrows(IllegalArgumentException.class, () -> excessiveCpu.run(runContext));
 
         SubmitJob conflictingResources = SubmitJob.builder()
-            .token(Property.of("key"))
-            .image(Property.of("img:latest"))
-            .cpu(Property.of(2))
-            .gpu(Property.of(1))
+            .token(Property.ofValue("key"))
+            .image(Property.ofValue("img:latest"))
+            .cpu(Property.ofValue(2))
+            .gpu(Property.ofValue(1))
             .build();
         assertThrows(IllegalArgumentException.class, () -> conflictingResources.run(runContext));
     }
@@ -549,12 +544,12 @@ class AiTrainingAndDeployTest {
 
         RunContext runContext = runContextFactory.of();
         SubmitJob task = SubmitJob.builder()
-            .endpoint(Property.of(testEndpoint))
-            .token(Property.of("ovh-test-token-12345"))
-            .image(Property.of("python:3.11-slim"))
-            .command(Property.of(List.of("python", "train_cpu.py")))
-            .name(Property.of("cpu-training-job"))
-            .cpu(Property.of(4))
+            .endpoint(Property.ofValue(testEndpoint))
+            .token(Property.ofValue("ovh-test-token-12345"))
+            .image(Property.ofValue("python:3.11-slim"))
+            .command(Property.ofValue(List.of("python", "train_cpu.py")))
+            .name(Property.ofValue("cpu-training-job"))
+            .cpu(Property.ofValue(4))
             .build();
 
         SubmitJob.Output output = task.run(runContext);
@@ -593,12 +588,12 @@ class AiTrainingAndDeployTest {
 
         RunContext runContext = runContextFactory.of();
         CreateApp task = CreateApp.builder()
-            .endpoint(Property.of(testEndpoint))
-            .token(Property.of("ovh-test-token-12345"))
-            .image(Property.of("vllm/vllm-openai:latest"))
-            .name(Property.of("llm-serving-app"))
-            .gpu(Property.of(2))
-            .gpuModel(Property.of("Tesla-V100S"))
+            .endpoint(Property.ofValue(testEndpoint))
+            .token(Property.ofValue("ovh-test-token-12345"))
+            .image(Property.ofValue("vllm/vllm-openai:latest"))
+            .name(Property.ofValue("llm-serving-app"))
+            .gpu(Property.ofValue(2))
+            .gpuModel(Property.ofValue("Tesla-V100S"))
             .build();
 
         CreateApp.Output output = task.run(runContext);
@@ -623,9 +618,21 @@ class AiTrainingAndDeployTest {
         RunContext runContext = runContextFactory.of();
 
         GetJob task = GetJob.builder()
-            .jobId(Property.of("00000000-0000-0000-0000-000000000000"))
+            .jobId(Property.ofValue("00000000-0000-0000-0000-000000000000"))
             .build();
 
         assertThrows(IllegalArgumentException.class, () -> task.run(runContext));
+    }
+    @Test
+    void testDefaultEndpoints() throws Exception {
+        RunContext runContext = runContextFactory.of();
+        String expected = "https://gra.training.ai.cloud.ovh.net";
+
+        assertThat(runContext.render(SubmitJob.builder().build().getEndpoint()).as(String.class).orElse(null), is(expected));
+        assertThat(runContext.render(GetJob.builder().build().getEndpoint()).as(String.class).orElse(null), is(expected));
+        assertThat(runContext.render(CancelJob.builder().build().getEndpoint()).as(String.class).orElse(null), is(expected));
+        assertThat(runContext.render(CreateApp.builder().build().getEndpoint()).as(String.class).orElse(null), is(expected));
+        assertThat(runContext.render(GetApp.builder().build().getEndpoint()).as(String.class).orElse(null), is(expected));
+        assertThat(runContext.render(DeleteApp.builder().build().getEndpoint()).as(String.class).orElse(null), is(expected));
     }
 }
