@@ -6,7 +6,6 @@ import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
-import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.plugin.ovhcloud.AbstractOvhTask;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -57,20 +56,14 @@ public class GetJob extends AbstractOvhTask implements RunnableTask<GetJob.Outpu
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        String rJobId = runContext.render(this.jobId).as(String.class).orElseThrow();
-        String path = "/v1/job/" + encodePath(rJobId);
+        var rJobId = runContext.render(this.jobId).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("'jobId' is empty: set it to the job UUID returned by SubmitJob"));
+        var path = "/v1/job/" + encodePath(rJobId);
 
-        OvhResponse res = this.executeOvhRequest(runContext, "GET", path, null);
-        if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
-            throw new RuntimeException("OVHcloud AI GetJob failed with status " + res.getStatusCode() + ": " + res.getBody());
-        }
+        var res = this.executeOvhRequest(runContext, "GET", path, null);
+        var response = readResponse(res, JobResponse.class, "GetJob");
 
-        if (res.getBody() == null || res.getBody().isBlank()) {
-            throw new IllegalStateException("OVHcloud AI GetJob response body is empty");
-        }
-
-        JobResponse response = JacksonMapper.ofJson().readValue(res.getBody(), JobResponse.class);
-        if (response == null || response.getId() == null || response.getId().isBlank()) {
+        if (response.getId() == null || response.getId().isBlank()) {
             throw new IllegalStateException("OVHcloud AI response is missing required 'id' property: " + res.getBody());
         }
 

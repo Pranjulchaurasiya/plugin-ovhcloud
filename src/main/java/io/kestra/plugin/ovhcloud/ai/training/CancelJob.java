@@ -54,13 +54,12 @@ public class CancelJob extends AbstractOvhTask implements RunnableTask<CancelJob
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        String rJobId = runContext.render(this.jobId).as(String.class).orElseThrow();
-        String path = "/v1/job/" + encodePath(rJobId) + "/kill";
+        var rJobId = runContext.render(this.jobId).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("'jobId' is empty: set it to the job UUID returned by SubmitJob"));
+        var path = "/v1/job/" + encodePath(rJobId) + "/kill";
 
-        OvhResponse res = this.executeOvhRequest(runContext, "PUT", path, null);
-        if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
-            throw new RuntimeException("OVHcloud AI CancelJob failed with status " + res.getStatusCode() + ": " + res.getBody());
-        }
+        var res = this.executeOvhRequest(runContext, "PUT", path, null);
+        checkStatus(res, "CancelJob");
 
         return Output.builder()
             .jobId(rJobId)

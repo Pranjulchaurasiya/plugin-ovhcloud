@@ -6,7 +6,6 @@ import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
-import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.plugin.ovhcloud.AbstractOvhTask;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -57,20 +56,14 @@ public class GetApp extends AbstractOvhTask implements RunnableTask<GetApp.Outpu
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        String rAppId = runContext.render(this.appId).as(String.class).orElseThrow();
-        String path = "/v1/app/" + encodePath(rAppId);
+        var rAppId = runContext.render(this.appId).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("'appId' is empty: set it to the app UUID returned by CreateApp"));
+        var path = "/v1/app/" + encodePath(rAppId);
 
-        OvhResponse res = this.executeOvhRequest(runContext, "GET", path, null);
-        if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
-            throw new RuntimeException("OVHcloud AI GetApp failed with status " + res.getStatusCode() + ": " + res.getBody());
-        }
+        var res = this.executeOvhRequest(runContext, "GET", path, null);
+        var response = readResponse(res, AppResponse.class, "GetApp");
 
-        if (res.getBody() == null || res.getBody().isBlank()) {
-            throw new IllegalStateException("OVHcloud AI GetApp response body is empty");
-        }
-
-        AppResponse response = JacksonMapper.ofJson().readValue(res.getBody(), AppResponse.class);
-        if (response == null || response.getId() == null || response.getId().isBlank()) {
+        if (response.getId() == null || response.getId().isBlank()) {
             throw new IllegalStateException("OVHcloud AI response is missing required 'id' property: " + res.getBody());
         }
 

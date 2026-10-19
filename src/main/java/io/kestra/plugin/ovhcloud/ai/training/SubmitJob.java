@@ -22,7 +22,6 @@ import lombok.experimental.SuperBuilder;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @SuperBuilder
 @ToString
@@ -82,10 +81,8 @@ public class SubmitJob extends AbstractOvhTask implements RunnableTask<SubmitJob
         title = "Number of GPUs to allocate for the job",
         description = "Must be between 1 and 4 GPUs (hardware/region dependent). Defaults to 1 GPU if cpu is not specified. Mutually exclusive with 'cpu'."
     )
-    @Min(1)
-    @Max(4)
     @PluginProperty(group = "advanced")
-    private Property<Integer> gpu;
+    private Property<@Min(1) @Max(4) Integer> gpu;
 
     @Schema(
         title = "GPU model type",
@@ -98,33 +95,22 @@ public class SubmitJob extends AbstractOvhTask implements RunnableTask<SubmitJob
         title = "Number of CPU cores to allocate for the job",
         description = "Must be between 1 and 12 vCores for CPU-only training workloads. Mutually exclusive with 'gpu'."
     )
-    @Min(1)
-    @Max(12)
     @PluginProperty(group = "advanced")
-    private Property<Integer> cpu;
+    private Property<@Min(1) @Max(12) Integer> cpu;
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        String rImage = runContext.render(this.image).as(String.class).orElseThrow();
-        List<String> rCommand = runContext.render(this.command).asList(String.class);
-        String rName = runContext.render(this.name).as(String.class).orElse(null);
-        Integer rGpu = this.gpu != null ? runContext.render(this.gpu).as(Integer.class).orElse(null) : null;
-        String rGpuModel = this.gpuModel != null ? runContext.render(this.gpuModel).as(String.class).orElse(null) : null;
-        Integer rCpu = this.cpu != null ? runContext.render(this.cpu).as(Integer.class).orElse(null) : null;
+        var rImage = runContext.render(this.image).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("'image' is required: set it to a container image URI"));
+        var rCommand = runContext.render(this.command).asList(String.class);
+        var rName = runContext.render(this.name).as(String.class).orElse(null);
+        var rGpu = this.gpu != null ? runContext.render(this.gpu).as(Integer.class).orElse(null) : null;
+        var rGpuModel = this.gpuModel != null ? runContext.render(this.gpuModel).as(String.class).orElse(null) : null;
+        var rCpu = this.cpu != null ? runContext.render(this.cpu).as(Integer.class).orElse(null) : null;
 
-        if (rCpu != null && (rCpu < 1 || rCpu > 12)) {
-            throw new IllegalArgumentException("CPU allocation must be between 1 and 12 vCores (received: " + rCpu + ")");
-        }
+        validateComputeResources(rCpu, rGpu);
 
-        if (rGpu != null && (rGpu < 1 || rGpu > 4)) {
-            throw new IllegalArgumentException("GPU allocation must be between 1 and 4 GPUs (received: " + rGpu + ")");
-        }
-
-        if (rCpu != null && rGpu != null) {
-            throw new IllegalArgumentException("Cannot allocate both 'cpu' and 'gpu': OVHcloud AI flavors are either CPU-based or GPU-based.");
-        }
-
-        Map<String, Object> payload = new HashMap<>();
+        var payload = new HashMap<String, Object>();
         payload.put("image", rImage);
         if (rCommand != null && !rCommand.isEmpty()) {
             payload.put("command", rCommand);
@@ -133,11 +119,11 @@ public class SubmitJob extends AbstractOvhTask implements RunnableTask<SubmitJob
             payload.put("name", rName);
         }
 
-        Map<String, Object> resources = new HashMap<>();
+        var resources = new HashMap<String, Object>();
         if (rCpu != null) {
             resources.put("cpu", rCpu);
         } else {
-            int gpuCount = (rGpu != null) ? rGpu : 1;
+            var gpuCount = (rGpu != null) ? rGpu : 1;
             resources.put("gpu", gpuCount);
             if (rGpuModel != null && !rGpuModel.isBlank()) {
                 resources.put("gpuModel", rGpuModel);
@@ -145,18 +131,11 @@ public class SubmitJob extends AbstractOvhTask implements RunnableTask<SubmitJob
         }
         payload.put("resources", resources);
 
-        String jsonPayload = JacksonMapper.ofJson().writeValueAsString(payload);
-        OvhResponse res = this.executeOvhRequest(runContext, "POST", "/v1/job", jsonPayload);
-        if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
-            throw new RuntimeException("OVHcloud AI SubmitJob failed with status " + res.getStatusCode() + ": " + res.getBody());
-        }
+        var jsonPayload = JacksonMapper.ofJson().writeValueAsString(payload);
+        var res = this.executeOvhRequest(runContext, "POST", "/v1/job", jsonPayload);
+        var response = readResponse(res, JobResponse.class, "SubmitJob");
 
-        if (res.getBody() == null || res.getBody().isBlank()) {
-            throw new IllegalStateException("OVHcloud AI SubmitJob response body is empty");
-        }
-
-        JobResponse response = JacksonMapper.ofJson().readValue(res.getBody(), JobResponse.class);
-        if (response == null || response.getId() == null || response.getId().isBlank()) {
+        if (response.getId() == null || response.getId().isBlank()) {
             throw new IllegalStateException("OVHcloud AI response is missing required 'id' property: " + res.getBody());
         }
 

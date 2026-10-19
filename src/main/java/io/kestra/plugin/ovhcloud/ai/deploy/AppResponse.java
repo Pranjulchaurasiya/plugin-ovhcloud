@@ -21,14 +21,11 @@ public class AppResponse {
     @JsonProperty("id")
     private String id;
 
-    @JsonProperty("name")
-    private String name;
+    @JsonProperty("spec")
+    private AppSpec spec;
 
     @JsonProperty("status")
     private AppStatus status;
-
-    @JsonProperty("url")
-    private String url;
 
     @JsonProperty("createdAt")
     private String createdAt;
@@ -44,15 +41,26 @@ public class AppResponse {
         return AbstractOvhTask.parseInstantSafe(updatedAt);
     }
 
+    public String getName() {
+        return spec != null ? spec.getName() : null;
+    }
+
     public String getUrl() {
-        if (status != null && status.getUrl() != null && !status.getUrl().isBlank()) {
-            return status.getUrl();
-        }
-        return url;
+        return status != null ? status.getUrl() : null;
     }
 
     public String getState() {
         return status != null && status.getState() != null ? status.getState() : "UNKNOWN";
+    }
+
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class AppSpec {
+        @JsonProperty("name")
+        private String name;
     }
 
     @Getter
@@ -71,9 +79,6 @@ public class AppResponse {
         public static AppStatus fromJson(JsonNode node) {
             if (node == null || node.isNull()) {
                 return null;
-            }
-            if (node.isTextual()) {
-                return AppStatus.builder().state(node.asText()).build();
             }
             String state = node.hasNonNull("state") ? node.get("state").asText() : null;
             String url = node.hasNonNull("url") ? node.get("url").asText() : null;

@@ -54,13 +54,12 @@ public class DeleteApp extends AbstractOvhTask implements RunnableTask<DeleteApp
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        String rAppId = runContext.render(this.appId).as(String.class).orElseThrow();
-        String path = "/v1/app/" + encodePath(rAppId);
+        var rAppId = runContext.render(this.appId).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("'appId' is empty: set it to the app UUID returned by CreateApp"));
+        var path = "/v1/app/" + encodePath(rAppId);
 
-        OvhResponse res = this.executeOvhRequest(runContext, "DELETE", path, null);
-        if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
-            throw new RuntimeException("OVHcloud AI DeleteApp failed with status " + res.getStatusCode() + ": " + res.getBody());
-        }
+        var res = this.executeOvhRequest(runContext, "DELETE", path, null);
+        checkStatus(res, "DeleteApp");
 
         return Output.builder()
             .appId(rAppId)

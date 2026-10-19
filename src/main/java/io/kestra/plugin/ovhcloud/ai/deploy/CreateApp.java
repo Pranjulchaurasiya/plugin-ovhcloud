@@ -21,7 +21,6 @@ import lombok.experimental.SuperBuilder;
 
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.Map;
 
 @SuperBuilder
 @ToString
@@ -72,19 +71,15 @@ public class CreateApp extends AbstractOvhTask implements RunnableTask<CreateApp
         title = "Number of CPU cores allocated for the app",
         description = "Must be between 1 and 12 cores. Mutually exclusive with 'gpu'. Defaults to 1 core."
     )
-    @Min(1)
-    @Max(12)
     @PluginProperty(group = "advanced")
-    private Property<Integer> cpu;
+    private Property<@Min(1) @Max(12) Integer> cpu;
 
     @Schema(
         title = "Number of GPUs allocated for the app",
         description = "Must be between 1 and 4 GPUs. Mutually exclusive with 'cpu'."
     )
-    @Min(1)
-    @Max(4)
     @PluginProperty(group = "advanced")
-    private Property<Integer> gpu;
+    private Property<@Min(1) @Max(4) Integer> gpu;
 
     @Schema(
         title = "GPU model type",
@@ -95,54 +90,38 @@ public class CreateApp extends AbstractOvhTask implements RunnableTask<CreateApp
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        String rImage = runContext.render(this.image).as(String.class).orElseThrow();
-        String rName = runContext.render(this.name).as(String.class).orElse(null);
-        Integer rCpu = this.cpu != null ? runContext.render(this.cpu).as(Integer.class).orElse(null) : null;
-        Integer rGpu = this.gpu != null ? runContext.render(this.gpu).as(Integer.class).orElse(null) : null;
-        String rGpuModel = this.gpuModel != null ? runContext.render(this.gpuModel).as(String.class).orElse(null) : null;
+        var rImage = runContext.render(this.image).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("'image' is required: set it to a container image URI"));
+        var rName = runContext.render(this.name).as(String.class).orElse(null);
+        var rCpu = this.cpu != null ? runContext.render(this.cpu).as(Integer.class).orElse(null) : null;
+        var rGpu = this.gpu != null ? runContext.render(this.gpu).as(Integer.class).orElse(null) : null;
+        var rGpuModel = this.gpuModel != null ? runContext.render(this.gpuModel).as(String.class).orElse(null) : null;
 
-        if (rCpu != null && (rCpu < 1 || rCpu > 12)) {
-            throw new IllegalArgumentException("CPU allocation must be between 1 and 12 cores (received: " + rCpu + ")");
-        }
+        validateComputeResources(rCpu, rGpu);
 
-        if (rGpu != null && (rGpu < 1 || rGpu > 4)) {
-            throw new IllegalArgumentException("GPU allocation must be between 1 and 4 GPUs (received: " + rGpu + ")");
-        }
-
-        if (rCpu != null && rGpu != null) {
-            throw new IllegalArgumentException("Cannot allocate both 'cpu' and 'gpu': OVHcloud AI Deploy flavors are either CPU-based or GPU-based.");
-        }
-
-        Map<String, Object> payload = new HashMap<>();
+        var payload = new HashMap<String, Object>();
         payload.put("image", rImage);
         if (rName != null && !rName.isBlank()) {
             payload.put("name", rName);
         }
 
-        Map<String, Object> resources = new HashMap<>();
+        var resources = new HashMap<String, Object>();
         if (rGpu != null) {
             resources.put("gpu", rGpu);
             if (rGpuModel != null && !rGpuModel.isBlank()) {
                 resources.put("gpuModel", rGpuModel);
             }
         } else {
-            int cpuCount = (rCpu != null) ? rCpu : 1;
+            var cpuCount = (rCpu != null) ? rCpu : 1;
             resources.put("cpu", cpuCount);
         }
         payload.put("resources", resources);
 
-        String jsonPayload = JacksonMapper.ofJson().writeValueAsString(payload);
-        OvhResponse res = this.executeOvhRequest(runContext, "POST", "/v1/app", jsonPayload);
-        if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
-            throw new RuntimeException("OVHcloud AI CreateApp failed with status " + res.getStatusCode() + ": " + res.getBody());
-        }
+        var jsonPayload = JacksonMapper.ofJson().writeValueAsString(payload);
+        var res = this.executeOvhRequest(runContext, "POST", "/v1/app", jsonPayload);
+        var response = readResponse(res, AppResponse.class, "CreateApp");
 
-        if (res.getBody() == null || res.getBody().isBlank()) {
-            throw new IllegalStateException("OVHcloud AI CreateApp response body is empty");
-        }
-
-        AppResponse response = JacksonMapper.ofJson().readValue(res.getBody(), AppResponse.class);
-        if (response == null || response.getId() == null || response.getId().isBlank()) {
+        if (response.getId() == null || response.getId().isBlank()) {
             throw new IllegalStateException("OVHcloud AI response is missing required 'id' property: " + res.getBody());
         }
 

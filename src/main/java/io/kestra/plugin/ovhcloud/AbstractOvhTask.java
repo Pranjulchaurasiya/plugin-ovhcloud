@@ -10,6 +10,7 @@ import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.JacksonMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -69,9 +70,6 @@ public abstract class AbstractOvhTask extends Task {
         return DEFAULT_AI_ENDPOINT;
     }
 
-    /**
-     * Strictly URL-encodes path segments and forbids traversal components ('.', '..', slashes).
-     */
     public static String encodePath(String segment) {
         if (segment == null || segment.isBlank()) {
             throw new IllegalArgumentException("Path segment must not be null or blank");
@@ -79,27 +77,17 @@ public abstract class AbstractOvhTask extends Task {
         if (segment.equals(".") || segment.equals("..") || segment.contains("/") || segment.contains("\\") || segment.contains("..")) {
             throw new IllegalArgumentException("Invalid path segment: path traversal segments ('.', '..') are not permitted (received: " + segment + ")");
         }
-        try {
-            return URLEncoder.encode(segment, StandardCharsets.UTF_8).replace("+", "%20");
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to URL-encode path segment: " + segment, e);
-        }
+        return URLEncoder.encode(segment, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
-    /**
-     * Strictly validates host against exact allowed OVHcloud AI regional data-plane hosts and loopback test hosts.
-     */
     public static boolean isAllowedHost(String host) {
         if (host == null) {
             return false;
         }
-        String lower = host.toLowerCase(Locale.ROOT);
+        var lower = host.toLowerCase(Locale.ROOT);
         return ALLOWED_AI_HOSTS.contains(lower) || LOOPBACK_HOSTS.contains(lower);
     }
 
-    /**
-     * Safely parses an ISO-8601 timestamp string into an Instant, returning null if unparseable or blank.
-     */
     public static Instant parseInstantSafe(String isoDate) {
         if (isoDate == null || isoDate.isBlank()) {
             return null;
@@ -111,50 +99,87 @@ public abstract class AbstractOvhTask extends Task {
         }
     }
 
+    public static void validateComputeResources(Integer cpu, Integer gpu) {
+        if (cpu != null && (cpu < 1 || cpu > 12)) {
+            throw new IllegalArgumentException("CPU allocation must be between 1 and 12 cores (received: " + cpu + ")");
+        }
+        if (gpu != null && (gpu < 1 || gpu > 4)) {
+            throw new IllegalArgumentException("GPU allocation must be between 1 and 4 GPUs (received: " + gpu + ")");
+        }
+        if (cpu != null && gpu != null) {
+            throw new IllegalArgumentException("Cannot allocate both 'cpu' and 'gpu': OVHcloud AI flavors are either CPU-based or GPU-based.");
+        }
+    }
+
+    protected void checkStatus(OvhResponse res, String action) {
+        var code = res.getStatusCode();
+        if (code < 200 || code >= 300) {
+            if (code == 401 || code == 403) {
+                throw new IllegalStateException("OVHcloud AI " + action + " failed with status " + code +
+                    ": unauthorized or forbidden. Check that 'token' is a valid OVHcloud AI token with sufficient permissions for this resource. Response: " + res.getBody());
+            }
+            throw new RuntimeException("OVHcloud AI " + action + " failed with status " + code + ": " + res.getBody());
+        }
+    }
+
+    protected <T> T readResponse(OvhResponse res, Class<T> type, String action) throws Exception {
+        checkStatus(res, action);
+
+        if (res.getBody() == null || res.getBody().isBlank()) {
+            throw new IllegalStateException("OVHcloud AI " + action + " response body is empty");
+        }
+
+        var parsed = JacksonMapper.ofJson().readValue(res.getBody(), type);
+        if (parsed == null) {
+            throw new IllegalStateException("OVHcloud AI " + action + " response could not be parsed: " + res.getBody());
+        }
+        return parsed;
+    }
+
     protected OvhResponse executeOvhRequest(RunContext runContext, String method, String path, String body) throws Exception {
         if (this.token == null) {
             throw new IllegalArgumentException("The 'token' property is required for OVHcloud AI authentication.");
         }
 
-        String rEndpoint = this.endpoint != null ? runContext.render(this.endpoint).as(String.class).orElse(null) : null;
+        var rEndpoint = this.endpoint != null ? runContext.render(this.endpoint).as(String.class).orElse(null) : null;
         if (rEndpoint == null || rEndpoint.isBlank()) {
             rEndpoint = defaultEndpoint();
         }
 
-        URI parsedUri = URI.create(rEndpoint);
+        var parsedUri = URI.create(rEndpoint);
         if (parsedUri.getUserInfo() != null) {
             throw new IllegalArgumentException("Endpoint must not contain userinfo/credentials (received: " + rEndpoint + ")");
         }
 
-        String host = parsedUri.getHost();
+        var host = parsedUri.getHost();
         if (host == null || !isAllowedHost(host)) {
             throw new IllegalArgumentException("Endpoint host '" + host + "' is not a recognized OVHcloud AI data-plane host or local test host.");
         }
 
-        String scheme = parsedUri.getScheme();
+        var scheme = parsedUri.getScheme();
         if (!"https".equalsIgnoreCase(scheme)) {
             if (!LOOPBACK_HOSTS.contains(host.toLowerCase(Locale.ROOT))) {
                 throw new IllegalArgumentException("Insecure HTTP endpoint is only permitted for loopback testing. Received scheme '" + scheme + "' for host: " + host);
             }
         }
 
-        int port = parsedUri.getPort();
+        var port = parsedUri.getPort();
         if (port != -1 && port != 443 && !LOOPBACK_HOSTS.contains(host.toLowerCase(Locale.ROOT))) {
             throw new IllegalArgumentException("Custom ports are not permitted for cloud endpoints. Port must be 443 or omitted. Received: " + port);
         }
 
-        String fullUrl = rEndpoint + (path.startsWith("/") ? path : "/" + path);
+        var fullUrl = rEndpoint + (path.startsWith("/") ? path : "/" + path);
 
-        BearerAuthConfiguration authConfig = BearerAuthConfiguration.builder()
+        var authConfig = BearerAuthConfiguration.builder()
             .token(this.token)
             .build();
 
-        HttpConfiguration httpConfig = HttpConfiguration.builder()
+        var httpConfig = HttpConfiguration.builder()
             .auth(authConfig)
             .allowFailed(Property.ofValue(true))
             .build();
 
-        HttpRequest.HttpRequestBuilder reqBuilder = HttpRequest.builder()
+        var reqBuilder = HttpRequest.builder()
             .method(method)
             .uri(URI.create(fullUrl))
             .addHeader("Accept", "application/json");
@@ -168,13 +193,13 @@ public abstract class AbstractOvhTask extends Task {
                 .build());
         }
 
-        try (HttpClient client = new HttpClient(runContext, httpConfig)) {
+        try (var client = new HttpClient(runContext, httpConfig)) {
             try {
                 HttpResponse<String> response = client.request(reqBuilder.build(), String.class);
                 return new OvhResponse(response.getStatus().getCode(), response.getBody() != null ? response.getBody() : "");
             } catch (HttpClientResponseException e) {
                 if (e.getResponse() != null) {
-                    Object respBody = e.getResponse().getBody();
+                    var respBody = e.getResponse().getBody();
                     return new OvhResponse(e.getResponse().getStatus().getCode(), respBody != null ? respBody.toString() : "");
                 }
                 throw e;

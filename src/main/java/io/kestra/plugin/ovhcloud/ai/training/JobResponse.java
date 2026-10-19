@@ -27,15 +27,6 @@ public class JobResponse {
     @JsonProperty("createdAt")
     private String createdAt;
 
-    @JsonProperty("startDate")
-    private String startDate;
-
-    @JsonProperty("endDate")
-    private String endDate;
-
-    @JsonProperty("url")
-    private String url;
-
     public Instant getCreatedAtInstant() {
         return AbstractOvhTask.parseInstantSafe(createdAt);
     }
@@ -44,7 +35,7 @@ public class JobResponse {
         if (status != null && status.getStartedAt() != null && !status.getStartedAt().isBlank()) {
             return AbstractOvhTask.parseInstantSafe(status.getStartedAt());
         }
-        return AbstractOvhTask.parseInstantSafe(startDate);
+        return null;
     }
 
     public Instant getEndDateInstant() {
@@ -56,14 +47,11 @@ public class JobResponse {
                 return AbstractOvhTask.parseInstantSafe(status.getFinalizedAt());
             }
         }
-        return AbstractOvhTask.parseInstantSafe(endDate);
+        return null;
     }
 
     public String getUrl() {
-        if (status != null && status.getUrl() != null && !status.getUrl().isBlank()) {
-            return status.getUrl();
-        }
-        return url;
+        return status != null ? status.getUrl() : null;
     }
 
     public String getState() {
@@ -102,9 +90,6 @@ public class JobResponse {
         public static JobStatus fromJson(JsonNode node) {
             if (node == null || node.isNull()) {
                 return null;
-            }
-            if (node.isTextual()) {
-                return JobStatus.builder().state(node.asText()).build();
             }
             String state = node.hasNonNull("state") ? node.get("state").asText() : null;
             Integer exitCode = node.hasNonNull("exitCode") ? node.get("exitCode").asInt() : null;
