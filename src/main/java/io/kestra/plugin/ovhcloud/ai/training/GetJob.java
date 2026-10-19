@@ -25,7 +25,9 @@ import java.time.Instant;
 @NoArgsConstructor
 @Schema(
     title = "Get OVHcloud AI Training Job",
-    description = "Fetches status, metrics, and details of an OVHcloud AI Training job by ID."
+    description = """
+        Fetches status, metrics, and details of an OVHcloud AI Training job by ID.
+        """
 )
 @Plugin(
     examples = {
@@ -48,7 +50,9 @@ import java.time.Instant;
 public class GetJob extends AbstractOvhTask implements RunnableTask<GetJob.Output> {
     @Schema(
         title = "The unique identifier of the training job",
-        description = "UUID assigned to the job when submitted."
+        description = """
+            UUID assigned to the job when submitted.
+            """
     )
     @NotNull
     @PluginProperty(group = "main")

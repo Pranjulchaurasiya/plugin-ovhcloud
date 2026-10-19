@@ -470,7 +470,9 @@ class AiTrainingAndDeployTest {
             .jobId(Property.ofValue("j1"))
             .build();
 
-        assertThrows(IllegalArgumentException.class, () -> task.run(runContext));
+        var ex = assertThrows(IllegalArgumentException.class, () -> task.run(runContext));
+        assertThat(ex.getMessage(), containsString("'endpoint' must not contain userinfo"));
+        assertThat(ex.getMessage(), not(containsString("pass")));
     }
 
     @Test

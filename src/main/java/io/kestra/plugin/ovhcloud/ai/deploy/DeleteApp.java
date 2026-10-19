@@ -23,7 +23,9 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @Schema(
     title = "Delete OVHcloud AI Serving App",
-    description = "Permanently deletes and tears down an OVHcloud AI Deploy model serving application."
+    description = """
+        Permanently deletes and tears down an OVHcloud AI Deploy model serving application.
+        """
 )
 @Plugin(
     examples = {
@@ -46,7 +48,9 @@ import lombok.experimental.SuperBuilder;
 public class DeleteApp extends AbstractOvhTask implements RunnableTask<DeleteApp.Output> {
     @Schema(
         title = "The unique identifier of the serving application to delete",
-        description = "UUID of the application to terminate and remove."
+        description = """
+            UUID of the application to terminate and remove.
+            """
     )
     @NotNull
     @PluginProperty(group = "main")

@@ -25,7 +25,9 @@ import java.time.Instant;
 @NoArgsConstructor
 @Schema(
     title = "Get OVHcloud AI Serving App",
-    description = "Retrieves status, endpoints, and health of an OVHcloud AI Deploy model serving application."
+    description = """
+        Retrieves status, endpoints, and health of an OVHcloud AI Deploy model serving application.
+        """
 )
 @Plugin(
     examples = {
@@ -48,7 +50,9 @@ import java.time.Instant;
 public class GetApp extends AbstractOvhTask implements RunnableTask<GetApp.Output> {
     @Schema(
         title = "The unique identifier of the serving application",
-        description = "UUID of the deployed application."
+        description = """
+            UUID of the deployed application.
+            """
     )
     @NotNull
     @PluginProperty(group = "main")

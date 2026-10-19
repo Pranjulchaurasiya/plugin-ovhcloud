@@ -23,7 +23,9 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @Schema(
     title = "Cancel OVHcloud AI Training Job",
-    description = "Cancels or stops a running OVHcloud AI Training job."
+    description = """
+        Cancels or stops a running OVHcloud AI Training job.
+        """
 )
 @Plugin(
     examples = {
@@ -46,7 +48,9 @@ import lombok.experimental.SuperBuilder;
 public class CancelJob extends AbstractOvhTask implements RunnableTask<CancelJob.Output> {
     @Schema(
         title = "The unique identifier of the training job to stop",
-        description = "UUID of the active job to terminate."
+        description = """
+            UUID of the active job to terminate.
+            """
     )
     @NotNull
     @PluginProperty(group = "main")

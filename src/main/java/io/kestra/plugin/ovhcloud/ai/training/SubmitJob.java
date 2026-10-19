@@ -30,7 +30,9 @@ import java.util.List;
 @NoArgsConstructor
 @Schema(
     title = "Submit OVHcloud AI Training Job",
-    description = "Submits a GPU or CPU distributed AI/ML training job to OVHcloud AI Training."
+    description = """
+        Submits a GPU or CPU distributed AI/ML training job to OVHcloud AI Training.
+        """
 )
 @Plugin(
     examples = {
@@ -57,7 +59,9 @@ import java.util.List;
 public class SubmitJob extends AbstractOvhTask implements RunnableTask<SubmitJob.Output> {
     @Schema(
         title = "The container image to execute for training",
-        description = "Public or private container image URI containing the training script and runtime."
+        description = """
+            Public or private container image URI containing the training script and runtime.
+            """
     )
     @NotNull
     @PluginProperty(group = "main")
@@ -65,14 +69,18 @@ public class SubmitJob extends AbstractOvhTask implements RunnableTask<SubmitJob
 
     @Schema(
         title = "The command line arguments for the training container",
-        description = "Array of command-line arguments to execute inside the container."
+        description = """
+            Array of command-line arguments to execute inside the container.
+            """
     )
     @PluginProperty(group = "main")
     private Property<List<String>> command;
 
     @Schema(
         title = "A user-friendly name for the training job",
-        description = "Label displayed in the OVHcloud manager dashboard and CLI."
+        description = """
+            Label displayed in the OVHcloud manager dashboard and CLI.
+            """
     )
     @PluginProperty(group = "main")
     private Property<String> name;
@@ -88,7 +96,9 @@ public class SubmitJob extends AbstractOvhTask implements RunnableTask<SubmitJob
 
     @Schema(
         title = "GPU model type",
-        description = "Specific accelerator model requested (e.g. 'Tesla-V100S', 'A100-SXM4-40GB', 'L4', 'L40S')."
+        description = """
+            Specific accelerator model requested (e.g. 'Tesla-V100S', 'A100-SXM4-40GB', 'L4', 'L40S').
+            """
     )
     @PluginProperty(group = "advanced")
     private Property<String> gpuModel;

@@ -29,7 +29,9 @@ import java.util.HashMap;
 @NoArgsConstructor
 @Schema(
     title = "Deploy OVHcloud AI Serving App",
-    description = "Deploys an AI model serving container endpoint on OVHcloud AI Deploy."
+    description = """
+        Deploys an AI model serving container endpoint on OVHcloud AI Deploy.
+        """
 )
 @Plugin(
     examples = {
@@ -54,7 +56,9 @@ import java.util.HashMap;
 public class CreateApp extends AbstractOvhTask implements RunnableTask<CreateApp.Output> {
     @Schema(
         title = "The container image to deploy for model serving",
-        description = "Container image URI exposing an HTTP inference service."
+        description = """
+            Container image URI exposing an HTTP inference service.
+            """
     )
     @NotNull
     @PluginProperty(group = "main")
@@ -62,7 +66,9 @@ public class CreateApp extends AbstractOvhTask implements RunnableTask<CreateApp
 
     @Schema(
         title = "A unique friendly name for the serving application",
-        description = "Identifier tag displayed on the OVHcloud AI dashboard."
+        description = """
+            Identifier tag displayed on the OVHcloud AI dashboard.
+            """
     )
     @PluginProperty(group = "main")
     private Property<String> name;
@@ -87,7 +93,9 @@ public class CreateApp extends AbstractOvhTask implements RunnableTask<CreateApp
 
     @Schema(
         title = "GPU model type",
-        description = "Specific accelerator model requested (e.g. 'Tesla-V100S', 'A100-SXM4-40GB', 'L4', 'L40S')."
+        description = """
+            Specific accelerator model requested (e.g. 'Tesla-V100S', 'A100-SXM4-40GB', 'L4', 'L40S').
+            """
     )
     @PluginProperty(group = "advanced")
     private Property<String> gpuModel;

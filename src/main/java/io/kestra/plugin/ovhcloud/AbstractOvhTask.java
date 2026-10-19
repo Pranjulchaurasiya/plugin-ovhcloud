@@ -1,7 +1,6 @@
 package io.kestra.plugin.ovhcloud;
 
 import io.kestra.core.http.HttpRequest;
-import io.kestra.core.http.HttpResponse;
 import io.kestra.core.http.client.HttpClient;
 import io.kestra.core.http.client.HttpClientResponseException;
 import io.kestra.core.http.client.configurations.BearerAuthConfiguration;
@@ -152,7 +151,7 @@ public abstract class AbstractOvhTask extends Task {
 
         var parsedUri = URI.create(rEndpoint);
         if (parsedUri.getUserInfo() != null) {
-            throw new IllegalArgumentException("Endpoint must not contain userinfo/credentials (received: " + rEndpoint + ")");
+            throw new IllegalArgumentException("'endpoint' must not contain userinfo/credentials: remove userinfo and provide the token via 'token'.");
         }
 
         var host = parsedUri.getHost();
