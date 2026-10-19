@@ -20,7 +20,7 @@ tasks:
 - **SubmitJob**: Submit GPU or CPU AI/ML training jobs to OVHcloud AI Training.
   - **Required fields**: `token`, `image`
   - **Optional fields**: `command`, `name`, `gpu` (1–4), `gpuModel`, `cpu` (1–12), `endpoint` (defaults to Gravelines: `https://gra.training.ai.cloud.ovh.net`)
-- **GetJob**: Retrieve details, execution status (`QUEUED`, `RUNNING`, `DONE`, `FAILED`), container exit code, and direct dashboard URL of an existing training job.
+- **GetJob**: Retrieve details, execution status (`QUEUED`, `RUNNING`, `DONE`, `FAILED`), container exit code, and job access URL of an existing training job.
   - **Required fields**: `token`, `jobId`
   - **Optional fields**: `endpoint`
 - **CancelJob**: Terminate or kill an active training job.

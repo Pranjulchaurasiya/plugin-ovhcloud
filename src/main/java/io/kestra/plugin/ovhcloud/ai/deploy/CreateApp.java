@@ -69,14 +69,18 @@ public class CreateApp extends AbstractOvhTask implements RunnableTask<CreateApp
 
     @Schema(
         title = "Number of CPU cores allocated for the app",
-        description = "Must be between 1 and 12 cores. Mutually exclusive with 'gpu'. Defaults to 1 core."
+        description = """
+            Must be between 1 and 12 cores. Mutually exclusive with 'gpu'. Defaults to 1 core.
+            """
     )
     @PluginProperty(group = "advanced")
     private Property<@Min(1) @Max(12) Integer> cpu;
 
     @Schema(
         title = "Number of GPUs allocated for the app",
-        description = "Must be between 1 and 4 GPUs. Mutually exclusive with 'cpu'."
+        description = """
+            Must be between 1 and 4 GPUs. Mutually exclusive with 'cpu'.
+            """
     )
     @PluginProperty(group = "advanced")
     private Property<@Min(1) @Max(4) Integer> gpu;

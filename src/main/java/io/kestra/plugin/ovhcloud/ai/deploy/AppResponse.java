@@ -1,9 +1,7 @@
 package io.kestra.plugin.ovhcloud.ai.deploy;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
 import io.kestra.plugin.ovhcloud.AbstractOvhTask;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -74,15 +72,5 @@ public class AppResponse {
 
         @JsonProperty("url")
         private String url;
-
-        @JsonCreator
-        public static AppStatus fromJson(JsonNode node) {
-            if (node == null || node.isNull()) {
-                return null;
-            }
-            String state = node.hasNonNull("state") ? node.get("state").asText() : null;
-            String url = node.hasNonNull("url") ? node.get("url").asText() : null;
-            return AppStatus.builder().state(state).url(url).build();
-        }
     }
 }

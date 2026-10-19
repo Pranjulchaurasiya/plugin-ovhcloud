@@ -50,7 +50,9 @@ public abstract class AbstractOvhTask extends Task {
 
     @Schema(
         title = "The OVHcloud AI API endpoint URL",
-        description = "Regional data-plane endpoint URL. Defaults to 'https://gra.training.ai.cloud.ovh.net' (supported regions: GRA, BHS)."
+        description = """
+            Regional data-plane endpoint URL. Defaults to 'https://gra.training.ai.cloud.ovh.net' (supported regions: GRA, BHS).
+            """
     )
     @Builder.Default
     @PluginProperty(group = "connection")
@@ -58,7 +60,9 @@ public abstract class AbstractOvhTask extends Task {
 
     @Schema(
         title = "The OVHcloud AI Bearer token",
-        description = "AI API Bearer token generated via 'ovhai token create' with the required role/permissions."
+        description = """
+            AI API Bearer token generated via 'ovhai token create' with the required role/permissions.
+            """
     )
     @NotNull
     @ToString.Exclude
@@ -195,7 +199,7 @@ public abstract class AbstractOvhTask extends Task {
 
         try (var client = new HttpClient(runContext, httpConfig)) {
             try {
-                HttpResponse<String> response = client.request(reqBuilder.build(), String.class);
+                var response = client.request(reqBuilder.build(), String.class);
                 return new OvhResponse(response.getStatus().getCode(), response.getBody() != null ? response.getBody() : "");
             } catch (HttpClientResponseException e) {
                 if (e.getResponse() != null) {

@@ -79,7 +79,9 @@ public class SubmitJob extends AbstractOvhTask implements RunnableTask<SubmitJob
 
     @Schema(
         title = "Number of GPUs to allocate for the job",
-        description = "Must be between 1 and 4 GPUs (hardware/region dependent). Defaults to 1 GPU if cpu is not specified. Mutually exclusive with 'cpu'."
+        description = """
+            Must be between 1 and 4 GPUs (hardware/region dependent). Defaults to 1 GPU if cpu is not specified. Mutually exclusive with 'cpu'.
+            """
     )
     @PluginProperty(group = "advanced")
     private Property<@Min(1) @Max(4) Integer> gpu;
@@ -93,7 +95,9 @@ public class SubmitJob extends AbstractOvhTask implements RunnableTask<SubmitJob
 
     @Schema(
         title = "Number of CPU cores to allocate for the job",
-        description = "Must be between 1 and 12 vCores for CPU-only training workloads. Mutually exclusive with 'gpu'."
+        description = """
+            Must be between 1 and 12 vCores for CPU-only training workloads. Mutually exclusive with 'gpu'.
+            """
     )
     @PluginProperty(group = "advanced")
     private Property<@Min(1) @Max(12) Integer> cpu;
@@ -159,7 +163,7 @@ public class SubmitJob extends AbstractOvhTask implements RunnableTask<SubmitJob
         @Schema(title = "Creation timestamp of the training job")
         private final Instant createdAt;
 
-        @Schema(title = "Direct dashboard URL to access the job on OVHcloud")
+        @Schema(title = "URL to reach the job's exposed HTTP service (status.url)")
         private final String url;
     }
 }

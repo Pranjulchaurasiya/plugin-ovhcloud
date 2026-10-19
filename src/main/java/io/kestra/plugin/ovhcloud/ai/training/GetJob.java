@@ -99,7 +99,7 @@ public class GetJob extends AbstractOvhTask implements RunnableTask<GetJob.Outpu
         @Schema(title = "Container exit code if execution finished")
         private final Integer exitCode;
 
-        @Schema(title = "Direct dashboard URL to access the job on OVHcloud")
+        @Schema(title = "URL to reach the job's exposed HTTP service (status.url)")
         private final String url;
     }
 }
